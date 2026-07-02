@@ -1,5 +1,9 @@
 # tenantplane
 
+## Architecture
+
+![tenantplane Architecture](resources/architecture%20diagram.png)
+
 **tenantplane** is an open source virtual Kubernetes tenant platform built for modern platform engineering teams that need secure, transparent, and scalable multi-tenancy.
 
 It provides a lightweight and inspectable control plane for managing virtual Kubernetes tenants while keeping synchronization, isolation, and operations predictable and explainable.
