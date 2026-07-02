@@ -1,0 +1,15 @@
+apiVersion: tenantplane.io/v1alpha1
+kind: IsolationProfile
+metadata:
+  name: restricted
+spec:
+  level: restricted
+  controls:
+    podSecurity: restricted
+    defaultDenyNetworkPolicy: true
+    requireResourceRequests: true
+    runtimeClassName: ""
+    blockHostPathVolumes: true
+    blockPrivilegedContainers: true
+    apiFairness: tenant
+

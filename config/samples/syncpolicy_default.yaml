@@ -1,0 +1,26 @@
+apiVersion: tenantplane.io/v1alpha1
+kind: SyncPolicy
+metadata:
+  name: default
+spec:
+  conflictPolicy: manual
+  driftDetection:
+    enabled: true
+    interval: 30s
+  explain:
+    recordDecisions: true
+    retain: 1000
+  resources:
+    - apiVersion: v1
+      kind: Pod
+      direction: toHost
+    - apiVersion: v1
+      kind: Service
+      direction: bidirectional
+    - apiVersion: v1
+      kind: ConfigMap
+      direction: bidirectional
+    - apiVersion: v1
+      kind: Secret
+      direction: bidirectional
+

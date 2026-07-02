@@ -1,0 +1,21 @@
+apiVersion: tenantplane.io/v1alpha1
+kind: TenantCluster
+metadata:
+  name: dev
+  namespace: team-dev
+spec:
+  mode: shared
+  kubernetesVersion: v1.35.0
+  isolationProfileRef:
+    name: restricted
+  syncPolicyRef:
+    name: default
+  controlPlane:
+    replicas: 1
+    datastore:
+      type: sqlite
+  networking:
+    egressPolicy: deny-by-default
+  migration:
+    allowModeChange: true
+

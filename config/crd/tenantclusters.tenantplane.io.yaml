@@ -1,0 +1,106 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tenantclusters.tenantplane.io
+spec:
+  group: tenantplane.io
+  scope: Namespaced
+  names:
+    plural: tenantclusters
+    singular: tenantcluster
+    kind: TenantCluster
+    shortNames:
+      - tc
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - mode
+                - kubernetesVersion
+                - isolationProfileRef
+                - syncPolicyRef
+                - controlPlane
+              properties:
+                mode:
+                  type: string
+                  enum: ["shared", "dedicated", "private"]
+                kubernetesVersion:
+                  type: string
+                isolationProfileRef:
+                  type: object
+                  required: ["name"]
+                  properties:
+                    name:
+                      type: string
+                syncPolicyRef:
+                  type: object
+                  required: ["name"]
+                  properties:
+                    name:
+                      type: string
+                controlPlane:
+                  type: object
+                  required: ["replicas", "datastore"]
+                  properties:
+                    replicas:
+                      type: integer
+                      minimum: 1
+                    datastore:
+                      type: object
+                      required: ["type"]
+                      properties:
+                        type:
+                          type: string
+                          enum: ["sqlite", "etcd", "postgres"]
+                networking:
+                  type: object
+                  properties:
+                    podCIDR:
+                      type: string
+                    serviceCIDR:
+                      type: string
+                    egressPolicy:
+                      type: string
+                      enum: ["deny-by-default", "allow-same-tenant", "unrestricted"]
+                migration:
+                  type: object
+                  properties:
+                    allowModeChange:
+                      type: boolean
+                resources:
+                  type: object
+                  properties:
+                    cpu:
+                      type: string
+                    memory:
+                      type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                endpoint:
+                  type: string
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+
