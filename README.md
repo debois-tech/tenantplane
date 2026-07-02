@@ -1,55 +1,141 @@
 # tenantplane
 
-tenantplane is an open source virtual Kubernetes tenant platform.
+**tenantplane** is an open source virtual Kubernetes tenant platform built for modern platform engineering teams that need secure, transparent, and scalable multi-tenancy.
 
-The goal is not to clone vCluster feature-for-feature. The goal is to build a small, inspectable control plane for teams that need:
+It provides a lightweight and inspectable control plane for managing virtual Kubernetes tenants while keeping synchronization, isolation, and operations predictable and explainable.
 
-- deterministic resource sync with dry-run and explain output
-- open source day-2 operations from the start
-- isolation profiles that include data-plane controls, not only API isolation
-- migration paths between shared, dedicated, and private tenant modes
-- high-density ephemeral tenant clusters for CI and internal platforms
+## Vision
 
-## Current status
+As Kubernetes adoption grows, platform teams need multi-tenancy that is easy to operate, secure by design, and flexible enough to support different workloads and isolation requirements.
 
-This repository is at the first scaffold stage. It includes:
+tenantplane aims to provide:
 
-- CRD definitions for `TenantCluster`, `IsolationProfile`, and `SyncPolicy`
-- a dependency-light CLI for generating example resources and explaining sync names
-- pure Go sync planning and isolation profile packages
-- initial deployment manifests and examples
+- Deterministic resource synchronization with dry-run planning and explainable output
+- Open implementations for day-2 platform operations
+- Configurable isolation profiles covering both control-plane and data-plane security
+- Flexible migration paths between shared, dedicated, and private tenant environments
+- High-density ephemeral tenant clusters for CI/CD, preview environments, and internal developer platforms
+- A lightweight architecture that is easy to understand, audit, and extend
 
-The next milestone is a Kubernetes controller that reconciles these CRDs into tenant control planes.
+---
 
-## Quick start
+## Current Status
 
-Build the CLI:
+tenantplane is currently in its early development stage.
 
-```sh
+The repository includes:
+
+- Custom Resource Definitions (CRDs)
+  - `TenantCluster`
+  - `IsolationProfile`
+  - `SyncPolicy`
+- A lightweight CLI for generating example resources
+- Commands for explaining tenant-to-host resource synchronization
+- Pure Go packages for sync planning and isolation profile management
+- Initial deployment manifests
+- Example configurations
+
+The next milestone is implementing the Kubernetes controller that reconciles these resources into fully functional tenant control planes.
+
+---
+
+## Quick Start
+
+### Build the CLI
+
+```bash
 go build ./cmd/tenantplane
 ```
 
-Generate a tenant cluster manifest:
+### Generate a TenantCluster manifest
 
-```sh
-tenantplane render tenantcluster dev --namespace team-dev --mode shared
+```bash
+tenantplane render tenantcluster dev \
+  --namespace team-dev \
+  --mode shared
 ```
 
-Explain how a tenant resource maps to the host:
+### Explain resource synchronization
 
-```sh
-tenantplane explain-sync --tenant dev --tenant-namespace team-dev --virtual-namespace default --kind Pod --name nginx
+```bash
+tenantplane explain-sync \
+  --tenant dev \
+  --tenant-namespace team-dev \
+  --virtual-namespace default \
+  --kind Pod \
+  --name nginx
 ```
 
-## Design principles
+---
 
-- Every sync decision should be explainable.
+## Core Resources
+
+### TenantCluster
+
+Represents a virtual Kubernetes tenant that can operate in shared, dedicated, or private modes.
+
+### IsolationProfile
+
+Defines security, networking, and resource isolation boundaries for tenant workloads.
+
+### SyncPolicy
+
+Defines how Kubernetes resources are synchronized between tenant environments and the host cluster with deterministic behavior.
+
+---
+
+## Design Principles
+
+- Every synchronization decision should be explainable.
 - Every isolation boundary should be explicit.
-- Every enterprise-critical day-2 feature should have an open implementation path.
-- Tenants should be migratable as their isolation needs change.
-- The host cluster should never become a mystery box.
+- Platform operations should remain transparent.
+- Enterprise-grade day-2 capabilities should be open and extensible.
+- Tenant environments should evolve as isolation requirements change.
+- The host cluster should always remain understandable and observable.
+
+---
+
+## Roadmap
+
+Planned milestones include:
+
+- Kubernetes reconciliation controller
+- Declarative synchronization engine
+- Bidirectional resource synchronization
+- Isolation profile enforcement
+- Dry-run execution and change previews
+- OpenTelemetry integration
+- Prometheus metrics
+- Multi-cluster tenant management
+- GitOps workflows
+- High-density ephemeral tenant provisioning
+- Tenant lifecycle management
+- Upgrade and migration workflows
+
+---
+
+## Why tenantplane?
+
+tenantplane is designed for teams that value transparency, predictability, and operational simplicity.
+
+Platform engineers should always be able to answer:
+
+- Why was a resource synchronized?
+- Why was a resource rejected?
+- Which policy made this decision?
+- What changes will occur before they are applied?
+- How can a tenant safely migrate between isolation models?
+
+---
+
+## Contributing
+
+Contributions are welcome!
+
+Whether you're interested in Kubernetes, controllers, networking, security, observability, documentation, or testing, we'd love your help. Feel free to open an issue or submit a pull request.
+
+---
 
 ## License
 
-Apache-2.0
-
+Licensed under the Apache License 2.0. See the `LICENSE` file for details.
