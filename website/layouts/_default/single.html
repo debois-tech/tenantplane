@@ -1,0 +1,13 @@
+{{ define "main" }}
+  <article class="prose">
+    <header class="doc-header">
+      <h1>{{ .Title }}</h1>
+      {{ with .Description }}<p class="lead">{{ . }}</p>{{ end }}
+    </header>
+    {{ .Content }}
+    <hr />
+    <p class="muted edit-hint">
+      Found a gap? <a href="{{ .Site.Params.githubURL }}" target="_blank" rel="noopener">Open an issue or PR</a>.
+    </p>
+  </article>
+{{ end }}

@@ -1,5 +1,59 @@
 package v1alpha1
 
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+type TenantCluster struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   TenantClusterSpec   `json:"spec,omitempty"`
+	Status TenantClusterStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+type TenantClusterList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []TenantCluster `json:"items"`
+}
+
+// +kubebuilder:object:root=true
+type IsolationProfile struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec IsolationProfileSpec `json:"spec,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+type IsolationProfileList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []IsolationProfile `json:"items"`
+}
+
+// +kubebuilder:object:root=true
+type SyncPolicy struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec SyncPolicySpec `json:"spec,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+type SyncPolicyList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []SyncPolicy `json:"items"`
+}
+
 type TenantMode string
 
 const (

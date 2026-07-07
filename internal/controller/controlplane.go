@@ -1,0 +1,178 @@
+package controller
+
+import (
+	"fmt"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/tenantplane/tenantplane/internal/api/v1alpha1"
+	"github.com/tenantplane/tenantplane/internal/isolation"
+)
+
+// defaultK3sImage is pinned to a known-good k3s release. TenantCluster.spec.kubernetesVersion
+// is accepted by the API but not yet wired to image selection: sample manifests reference
+// versions (e.g. v1.35.0) that have no corresponding k3s release yet, and blindly templating
+// the image tag from that field would just produce ImagePullBackOff. This is a known follow-up,
+// not a silent shortcut.
+const defaultK3sImage = "rancher/k3s:v1.30.4-k3s1"
+
+const apiPort = 6443
+
+func controlPlaneName(tc *v1alpha1.TenantCluster) string {
+	return tc.Name + "-control-plane"
+}
+
+func controlPlaneObjectMeta(tc *v1alpha1.TenantCluster, name string) metav1.ObjectMeta {
+	return metav1.ObjectMeta{
+		Name:      name,
+		Namespace: tc.Namespace,
+		Labels:    controlPlaneLabels(tc),
+	}
+}
+
+func controlPlaneLabels(tc *v1alpha1.TenantCluster) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/managed-by": "tenantplane",
+		"app.kubernetes.io/name":       "tenantplane-control-plane",
+		"tenantplane.io/tenant":        tc.Name,
+		isolation.ExemptLabelKey:       isolation.ExemptLabelValue,
+	}
+}
+
+// controlPlaneServiceFQDN is the in-cluster DNS name of the headless Service fronting
+// the control-plane pod; it doubles as the StatefulSet's governing service and the
+// endpoint published in the tenant kubeconfig.
+func controlPlaneServiceFQDN(tc *v1alpha1.TenantCluster) string {
+	return fmt.Sprintf("%s.%s.svc", controlPlaneName(tc), tc.Namespace)
+}
+
+func buildHeadlessService(tc *v1alpha1.TenantCluster) *corev1.Service {
+	name := controlPlaneName(tc)
+	labels := controlPlaneLabels(tc)
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: tc.Namespace,
+			Labels:    labels,
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: corev1.ClusterIPNone,
+			Selector:  labels,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "https",
+					Port:       apiPort,
+					TargetPort: intstr.FromInt(apiPort),
+				},
+			},
+		},
+	}
+}
+
+func buildStatefulSet(tc *v1alpha1.TenantCluster) *appsv1.StatefulSet {
+	name := controlPlaneName(tc)
+	labels := controlPlaneLabels(tc)
+	replicas := int32(tc.Spec.ControlPlane.Replicas)
+	if replicas < 1 {
+		replicas = 1
+	}
+
+	fqdn := controlPlaneServiceFQDN(tc)
+	args := []string{
+		"server",
+		"--data-dir=/data",
+		"--disable-agent",
+		"--disable=traefik,servicelb,metrics-server,local-storage,coredns",
+		"--write-kubeconfig-mode=644",
+		"--tls-san=" + fqdn,
+		"--tls-san=" + fqdn + ".cluster.local",
+	}
+
+	requests := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("250m"),
+		corev1.ResourceMemory: resource.MustParse("256Mi"),
+	}
+	limits := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("1"),
+		corev1.ResourceMemory: resource.MustParse("1Gi"),
+	}
+	if cpu := tc.Spec.Resources.CPU; cpu != "" {
+		limits[corev1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if mem := tc.Spec.Resources.Memory; mem != "" {
+		limits[corev1.ResourceMemory] = resource.MustParse(mem)
+	}
+
+	return &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: tc.Namespace,
+			Labels:    labels,
+		},
+		Spec: appsv1.StatefulSetSpec{
+			ServiceName: name,
+			Replicas:    &replicas,
+			Selector:    &metav1.LabelSelector{MatchLabels: labels},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: labels},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:    "k3s",
+							Image:   defaultK3sImage,
+							Command: []string{"k3s"},
+							Args:    args,
+							Ports: []corev1.ContainerPort{
+								{Name: "https", ContainerPort: apiPort},
+							},
+							Resources: corev1.ResourceRequirements{
+								Requests: requests,
+								Limits:   limits,
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "data", MountPath: "/data"},
+							},
+							ReadinessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(apiPort)},
+								},
+								InitialDelaySeconds: 5,
+								PeriodSeconds:       5,
+							},
+							LivenessProbe: &corev1.Probe{
+								ProbeHandler: corev1.ProbeHandler{
+									TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(apiPort)},
+								},
+								InitialDelaySeconds: 15,
+								PeriodSeconds:       15,
+							},
+						},
+					},
+				},
+			},
+			VolumeClaimTemplates: []corev1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "data"},
+					Spec: corev1.PersistentVolumeClaimSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// controlPlanePodName is the deterministic name of the sole StatefulSet replica.
+// Only valid while ControlPlane.Replicas <= 1, which is all this milestone supports.
+func controlPlanePodName(tc *v1alpha1.TenantCluster) string {
+	return controlPlaneName(tc) + "-0"
+}

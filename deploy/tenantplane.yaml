@@ -18,8 +18,11 @@ rules:
     resources: ["tenantclusters", "tenantclusters/status", "isolationprofiles", "syncpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["namespaces", "serviceaccounts", "services", "configmaps", "secrets", "pods"]
+    resources: ["namespaces", "serviceaccounts", "services", "configmaps", "secrets", "pods", "resourcequotas", "limitranges", "events"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -57,8 +60,26 @@ spec:
     spec:
       serviceAccountName: tenantplane-controller
       containers:
-        - name: controller
-          image: ghcr.io/tenantplane/tenantplane:dev
-          args:
-            - controller
-
+        - name: manager
+          image: tenantplane/manager:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

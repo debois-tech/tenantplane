@@ -218,6 +218,9 @@ func explainSync(args []string, stdout io.Writer) error {
 		return err
 	}
 
+	labels := syncplan.HostLabels(plan.Input)
+	annotations := syncplan.HostAnnotations(plan.Input)
+
 	fmt.Fprintf(stdout, `tenantResource:
   tenantCluster: %s
   virtualNamespace: %s
@@ -227,12 +230,25 @@ hostResource:
   namespace: %s
   name: %s
 labels:
-  tenantplane.io/tenant: %s
-  tenantplane.io/virtual-namespace: %s
-  tenantplane.io/kind: %s
+  %s: %s
+  %s: %s
+  %s: %s
+  %s: %s
+annotations:
+  %s: %s
+  %s: %s
 reason:
   %s
-`, plan.Input.TenantCluster, plan.Input.VirtualNamespace, plan.Input.Kind, plan.Input.Name, plan.Host.Namespace, plan.Host.Name, plan.Input.TenantCluster, plan.Input.VirtualNamespace, strings.ToLower(plan.Input.Kind), plan.Reason)
+`,
+		plan.Input.TenantCluster, plan.Input.VirtualNamespace, plan.Input.Kind, plan.Input.Name,
+		plan.Host.Namespace, plan.Host.Name,
+		syncplan.LabelManagedBy, labels[syncplan.LabelManagedBy],
+		syncplan.LabelTenant, labels[syncplan.LabelTenant],
+		syncplan.LabelVirtualNamespace, labels[syncplan.LabelVirtualNamespace],
+		syncplan.LabelKind, labels[syncplan.LabelKind],
+		syncplan.AnnotationVirtualNamespace, annotations[syncplan.AnnotationVirtualNamespace],
+		syncplan.AnnotationVirtualName, annotations[syncplan.AnnotationVirtualName],
+		plan.Reason)
 	return nil
 }
 
@@ -244,8 +260,7 @@ Usage:
   tenantplane render tenantcluster NAME [--namespace ns] [--mode shared|dedicated|private]
   tenantplane render isolationprofile NAME [--level baseline|restricted|sandboxed]
   tenantplane render syncpolicy NAME [--conflict-policy manual|tenant-wins|host-wins]
-  tenantplane explain-sync --tenant NAME --tenant-namespace NS --name RESOURCE_NAME [--kind Pod]
-`)
+  tenantplane explain-sync --tenant NAME --tenant-namespace NS --name RESOURCE_NAME [--kind Pod]`)
 }
 
 func requireDNSName(value, label string) error {

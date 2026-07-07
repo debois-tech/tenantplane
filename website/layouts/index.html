@@ -1,0 +1,86 @@
+{{ define "main" }}
+  <section class="hero">
+    <div class="container hero-inner">
+      <span class="eyebrow">Open source · Apache 2.0 · Kubernetes-native</span>
+      <h1 class="hero-title">{{ .Site.Params.tagline }}</h1>
+      <p class="hero-sub">
+        tenantplane gives platform teams lightweight virtual Kubernetes tenants where
+        <strong>every sync decision is explainable</strong> and <strong>every isolation boundary is explicit</strong>.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="{{ "/docs/quickstart/" | relURL }}">Get started →</a>
+        <a class="btn btn-ghost" href="{{ .Site.Params.githubURL }}" target="_blank" rel="noopener">Star on GitHub</a>
+      </div>
+      <pre class="hero-terminal"><code><span class="c-dim">$</span> tenantplane explain-sync --tenant dev --tenant-namespace team-dev \
+    --virtual-namespace default --kind Pod --name nginx
+<span class="c-key">hostResource:</span>
+  namespace: team-dev
+  name: <span class="c-val">nginx-x-default-x-dev</span>
+<span class="c-key">reason:</span>
+  stable name from resource + virtual namespace + tenant;
+  labels preserve the reverse mapping.</code></pre>
+    </div>
+  </section>
+
+  <section class="container section">
+    <h2 class="section-title">Why tenantplane</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <div class="feature-icon">🔍</div>
+        <h3>Explainable sync</h3>
+        <p>Deterministic virtual-to-host mapping with dry-run planning. Ask <em>why</em> any host object exists and get an answer.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🛡️</div>
+        <h3>Explicit isolation</h3>
+        <p>Isolation profiles compose NetworkPolicy, ResourceQuota, LimitRange, and Pod Security into one auditable boundary.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🪶</div>
+        <h3>Lightweight control planes</h3>
+        <p>Each tenant runs a small k3s control plane in a host namespace — easy to understand, audit, and extend.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔁</div>
+        <h3>Day-2 by design</h3>
+        <p>Reconciliation, drift-aware sync, and decision records built for the operational realities of multi-tenancy.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🧭</div>
+        <h3>Migration paths</h3>
+        <p>Evolve tenants across shared, dedicated, and private isolation models without recreating tenant API state.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📈</div>
+        <h3>Observable</h3>
+        <p>Decisions as Kubernetes Events today; OpenTelemetry and Prometheus on the roadmap.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="container section">
+    <h2 class="section-title">Three resources, one mental model</h2>
+    <div class="card-grid">
+      <a class="card" href="{{ "/docs/concepts/tenantcluster/" | relURL }}">
+        <h3>TenantCluster</h3>
+        <p>The lifecycle of one virtual Kubernetes tenant — shared, dedicated, or private.</p>
+      </a>
+      <a class="card" href="{{ "/docs/concepts/isolationprofile/" | relURL }}">
+        <h3>IsolationProfile</h3>
+        <p>The security and fairness boundary applied around a tenant's workloads.</p>
+      </a>
+      <a class="card" href="{{ "/docs/concepts/syncpolicy/" | relURL }}">
+        <h3>SyncPolicy</h3>
+        <p>Which resources cross the virtual-to-host boundary, and how conflicts resolve.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="container cta-inner">
+      <h2>Ready in minutes on a kind cluster</h2>
+      <p>Install the CRDs, apply a sample tenant, and watch the control plane come up.</p>
+      <a class="btn btn-primary" href="{{ "/docs/quickstart/" | relURL }}">Read the quickstart →</a>
+    </div>
+  </section>
+{{ end }}

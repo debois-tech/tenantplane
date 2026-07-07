@@ -1,0 +1,49 @@
+baseURL = "https://tenantplane.io/"
+languageCode = "en-us"
+title = "tenantplane"
+enableGitInfo = false
+
+# This project doesn't use tags/categories; keep the output tree clean.
+disableKinds = ["taxonomy", "term"]
+
+# Markdown / syntax highlighting
+[markup]
+  [markup.highlight]
+    noClasses = false
+    style = "github"
+  [markup.goldmark.renderer]
+    unsafe = true
+  [markup.tableOfContents]
+    startLevel = 2
+    endLevel = 3
+
+[params]
+  description = "Open source, inspectable virtual Kubernetes tenants. Deterministic sync, explicit isolation, transparent day-2 operations."
+  tagline = "Virtual Kubernetes tenants you can actually explain"
+  githubURL = "https://github.com/tenantplane/tenantplane"
+  # Placeholder branding — swap when real assets exist.
+  accent = "#4f46e5"
+
+# Primary navigation
+[[menu.main]]
+  name = "Docs"
+  url = "/docs/"
+  weight = 10
+[[menu.main]]
+  name = "Concepts"
+  url = "/docs/concepts/"
+  weight = 20
+[[menu.main]]
+  name = "Guides"
+  url = "/docs/guides/install/"
+  weight = 30
+[[menu.main]]
+  name = "Roadmap"
+  url = "/docs/roadmap/"
+  weight = 40
+[[menu.main]]
+  name = "GitHub"
+  url = "https://github.com/tenantplane/tenantplane"
+  weight = 50
+  [menu.main.params]
+    external = true

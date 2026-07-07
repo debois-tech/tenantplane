@@ -1,0 +1,49 @@
+{{ $current := .RelPermalink }}
+<nav class="docs-nav" aria-label="Documentation">
+  {{ $docs := where .Site.Pages "Section" "docs" }}
+
+  <div class="docs-nav-group">
+    <span class="docs-nav-title">Getting started</span>
+    <ul>
+      {{ range where $docs "File.TranslationBaseName" "introduction" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Introduction</a></li>{{ end }}
+      {{ range where $docs "File.TranslationBaseName" "quickstart" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Quickstart</a></li>{{ end }}
+      {{ range where $docs "File.TranslationBaseName" "architecture" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Architecture</a></li>{{ end }}
+    </ul>
+  </div>
+
+  <div class="docs-nav-group">
+    <span class="docs-nav-title">Concepts</span>
+    <ul>
+      {{ range sort (where $docs "Section" "docs") "Weight" }}
+        {{ if in .RelPermalink "/concepts/" }}
+          {{ if not (in .RelPermalink "/concepts/index") }}
+            <li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">{{ .Title }}</a></li>
+          {{ end }}
+        {{ end }}
+      {{ end }}
+    </ul>
+  </div>
+
+  <div class="docs-nav-group">
+    <span class="docs-nav-title">Guides</span>
+    <ul>
+      {{ range sort (where $docs "Section" "docs") "Weight" }}
+        {{ if in .RelPermalink "/guides/" }}
+          <li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">{{ .Title }}</a></li>
+        {{ end }}
+      {{ end }}
+    </ul>
+  </div>
+
+  <div class="docs-nav-group">
+    <span class="docs-nav-title">Reference</span>
+    <ul>
+      {{ range sort (where $docs "Section" "docs") "Weight" }}
+        {{ if in .RelPermalink "/reference/" }}
+          <li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">{{ .Title }}</a></li>
+        {{ end }}
+      {{ end }}
+      {{ range where $docs "File.TranslationBaseName" "roadmap" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Roadmap</a></li>{{ end }}
+    </ul>
+  </div>
+</nav>

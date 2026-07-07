@@ -1,0 +1,18 @@
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div>
+      <div class="brand"><span class="brand-mark">🛰️</span><span class="brand-name">tenantplane</span></div>
+      <p class="muted">{{ .Site.Params.description }}</p>
+    </div>
+    <div class="footer-links">
+      <a href="{{ "/docs/" | relURL }}">Documentation</a>
+      <a href="{{ "/docs/quickstart/" | relURL }}">Quickstart</a>
+      <a href="{{ .Site.Params.githubURL }}" target="_blank" rel="noopener">GitHub</a>
+      <a href="{{ "/docs/roadmap/" | relURL }}">Roadmap</a>
+    </div>
+  </div>
+  <div class="container footer-legal muted">
+    <span>Apache 2.0 licensed.</span>
+    <span>Early development — APIs are pre-1.0 and may change.</span>
+  </div>
+</footer>
