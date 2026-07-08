@@ -18,12 +18,18 @@ fields.
 | `spec.syncPolicyRef.name` | string | Referenced SyncPolicy. |
 | `spec.controlPlane.replicas` | int | Control-plane replicas (single supported). |
 | `spec.controlPlane.datastore.type` | string | `sqlite` only. |
+| `spec.controlPlane.storage.className` | string | StorageClass for the control-plane volume (e.g. `gp3` on EKS, `managed-csi` on AKS, `standard-rwo` on GKE). Empty = cluster default. |
+| `spec.controlPlane.storage.size` | string | Control-plane volume size (default `1Gi`). |
+| `spec.controlPlane.expose.loadBalancer` | bool | Publish the tenant API server via a LoadBalancer Service. |
+| `spec.controlPlane.expose.annotations` | map | Annotations for the LoadBalancer Service (cloud-specific behavior). |
+| `spec.controlPlane.extraTLSSANs` | []string | Extra TLS SANs for the tenant API certificate (e.g. the LB address). |
 | `spec.networking.podCIDR` / `serviceCIDR` | string | Optional tenant CIDRs. |
 | `spec.networking.egressPolicy` | string | Egress posture, e.g. `deny-by-default`. |
 | `spec.migration.allowModeChange` | bool | Whether mode migration is permitted. |
 | `spec.resources.cpu` / `memory` | string | Control-plane and quota sizing. |
 | `status.phase` | string | `Pending`/`Provisioning`/`Ready`/`Degraded`. |
-| `status.endpoint` | string | Tenant API server address once Ready. |
+| `status.endpoint` | string | In-cluster tenant API server address once Ready. |
+| `status.externalEndpoint` | string | Load-balancer address once `expose.loadBalancer` has provisioned. |
 | `status.conditions[]` | list | `Ready`, `Synced`, `ModeSupported`. |
 
 ## IsolationProfile

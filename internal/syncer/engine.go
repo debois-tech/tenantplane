@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/tenantplane/tenantplane/internal/syncplan"
+	"github.com/debois-tech/tenantplane/internal/syncplan"
 )
 
 // Direction controls which way a resource kind is synced across the

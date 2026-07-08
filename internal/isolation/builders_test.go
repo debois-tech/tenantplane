@@ -89,14 +89,23 @@ func TestBuildLimitRange(t *testing.T) {
 func TestPodSecurityLabels(t *testing.T) {
 	restricted, _ := ProfileForLevel("restricted")
 	labels := PodSecurityLabels(restricted)
-	want := "restricted"
+
+	// enforce is capped at baseline so the root-running k3s control-plane pod
+	// in the same namespace is not rejected by PSA.
+	if got := labels["pod-security.kubernetes.io/enforce"]; got != "baseline" {
+		t.Fatalf("enforce label = %q, want baseline (capped)", got)
+	}
 	for _, key := range []string{
-		"pod-security.kubernetes.io/enforce",
 		"pod-security.kubernetes.io/audit",
 		"pod-security.kubernetes.io/warn",
 	} {
-		if labels[key] != want {
-			t.Fatalf("labels[%q] = %q, want %q", key, labels[key], want)
+		if labels[key] != "restricted" {
+			t.Fatalf("labels[%q] = %q, want restricted", key, labels[key])
 		}
+	}
+
+	baseline, _ := ProfileForLevel("baseline")
+	if got := PodSecurityLabels(baseline)["pod-security.kubernetes.io/enforce"]; got != "baseline" {
+		t.Fatalf("baseline enforce label = %q, want baseline", got)
 	}
 }

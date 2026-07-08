@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 410" role="img" aria-label="how an IsolationProfile compiles into namespace isolation layers" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">
+  <style>
+    .box { fill: #f7f8fb; stroke: #d8dce6; stroke-width: 1.5; }
+    .accent { fill: #e7f4f1; stroke: #0e8276; stroke-width: 2; }
+    .amber { fill: #fbeee7; stroke: #d95a35; stroke-width: 1.5; }
+    .container { fill: none; stroke: #c4cad6; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .t { fill: #1a1c23; }
+    .m { fill: #5b6472; }
+    .a { fill: #0e8276; }
+    .arrow { stroke: #98a2b3; stroke-width: 1.8; fill: none; }
+    text { font-size: 14px; }
+    .small { font-size: 12px; }
+    .tiny { font-size: 11px; }
+    .cap { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+    .title { font-weight: 700; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161a24; stroke: #2a3040; }
+      .accent { fill: #0f2a2b; stroke: #4dd6c5; }
+      .amber { fill: #2b1b13; stroke: #d95a35; }
+      .container { stroke: #333a4d; }
+      .t { fill: #e8eaf0; }
+      .m { fill: #9aa4b6; }
+      .a { fill: #5ee6d3; }
+      .arrow { stroke: #4b5468; }
+    }
+  </style>
+  <defs>
+    <marker id="ilah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#98a2b3"/>
+    </marker>
+  </defs>
+
+  <!-- Profile -->
+  <rect class="accent" x="36" y="150" width="196" height="104" rx="11"/>
+  <text class="title a" x="134" y="188" text-anchor="middle">IsolationProfile</text>
+  <text class="small m" x="134" y="210" text-anchor="middle">level: restricted</text>
+  <text class="tiny m" x="134" y="230" text-anchor="middle">one declaration, four layers</text>
+
+  <path class="arrow" d="M232,202 L306,202" marker-end="url(#ilah)"/>
+  <text class="tiny m" x="238" y="192">compiled by</text>
+  <text class="tiny m" x="238" y="222">the controller</text>
+
+  <!-- Namespace container -->
+  <text class="cap m" x="330" y="36">TENANT NAMESPACE</text>
+  <rect class="container" x="318" y="46" width="626" height="344" rx="14"/>
+
+  <!-- Layers -->
+  <rect class="amber" x="348" y="70" width="264" height="56" rx="9"/>
+  <text class="title t" x="480" y="93" text-anchor="middle">NetworkPolicy</text>
+  <text class="tiny m" x="480" y="112" text-anchor="middle">default-deny ingress + egress</text>
+
+  <rect class="box" x="348" y="140" width="264" height="56" rx="9"/>
+  <text class="title t" x="480" y="163" text-anchor="middle">ResourceQuota</text>
+  <text class="tiny m" x="480" y="182" text-anchor="middle">aggregate cpu / memory caps</text>
+
+  <rect class="box" x="348" y="210" width="264" height="56" rx="9"/>
+  <text class="title t" x="480" y="233" text-anchor="middle">LimitRange</text>
+  <text class="tiny m" x="480" y="252" text-anchor="middle">per-container request/limit defaults</text>
+
+  <rect class="amber" x="348" y="280" width="264" height="56" rx="9"/>
+  <text class="title t" x="480" y="303" text-anchor="middle">Pod Security labels</text>
+  <text class="tiny m" x="480" y="322" text-anchor="middle">enforce · audit · warn</text>
+
+  <!-- Workloads -->
+  <rect class="box" x="676" y="118" width="236" height="130" rx="11"/>
+  <text class="title t" x="794" y="160" text-anchor="middle">Tenant workloads</text>
+  <text class="small m" x="794" y="184" text-anchor="middle">every pod in the namespace</text>
+  <text class="small m" x="794" y="204" text-anchor="middle">inside all four layers</text>
+
+  <!-- layer arrows -->
+  <path class="arrow" d="M612,98 C644,98 650,140 674,148" marker-end="url(#ilah)"/>
+  <path class="arrow" d="M612,168 L674,172" marker-end="url(#ilah)"/>
+  <path class="arrow" d="M612,238 C644,238 650,204 674,196" marker-end="url(#ilah)"/>
+  <path class="arrow" d="M612,308 C650,308 662,262 676,240" marker-end="url(#ilah)"/>
+
+  <!-- exemption note -->
+  <rect class="amber" x="676" y="290" width="236" height="76" rx="10"/>
+  <text class="tiny t" x="794" y="314" text-anchor="middle" font-weight="700">Exempt: control-plane pods</text>
+  <text class="tiny m" x="794" y="332" text-anchor="middle">tenantplane.io/isolation-exempt=true</text>
+  <text class="tiny m" x="794" y="348" text-anchor="middle">excluded from default-deny</text>
+</svg>

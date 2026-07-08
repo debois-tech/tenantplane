@@ -1,34 +1,71 @@
 {{ define "main" }}
+  <!-- Hero: orbit theme — tenants orbiting a host control plane -->
   <section class="hero">
     <div class="container hero-inner">
-      <span class="eyebrow">Open source · Apache 2.0 · Kubernetes-native</span>
-      <h1 class="hero-title">{{ .Site.Params.tagline }}</h1>
-      <p class="hero-sub">
-        tenantplane gives platform teams lightweight virtual Kubernetes tenants where
-        <strong>every sync decision is explainable</strong> and <strong>every isolation boundary is explicit</strong>.
-      </p>
-      <div class="hero-cta">
-        <a class="btn btn-primary" href="{{ "/docs/quickstart/" | relURL }}">Get started →</a>
-        <a class="btn btn-ghost" href="{{ .Site.Params.githubURL }}" target="_blank" rel="noopener">Star on GitHub</a>
+      <div class="hero-wordmark">
+        <img class="hero-logo" src="{{ "img/logo.svg" | relURL }}" alt="tenantplane logo" />
+        <span>tenant<span class="wm-alt">plane</span></span>
       </div>
-      <pre class="hero-terminal"><code><span class="c-dim">$</span> tenantplane explain-sync --tenant dev --tenant-namespace team-dev \
-    --virtual-namespace default --kind Pod --name nginx
-<span class="c-key">hostResource:</span>
-  namespace: team-dev
-  name: <span class="c-val">nginx-x-default-x-dev</span>
-<span class="c-key">reason:</span>
-  stable name from resource + virtual namespace + tenant;
-  labels preserve the reverse mapping.</code></pre>
+      <p class="hero-tagline">The open platform for explainable Kubernetes multi-tenancy</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="{{ "/docs/introduction/" | relURL }}">Learn more</a>
+        <a class="btn btn-outline" href="{{ "/docs/quickstart/" | relURL }}">Try the quickstart</a>
+      </div>
+      <div class="hero-search">
+        <span class="search-ico">🔍</span>
+        <input id="docs-search" type="search" placeholder="Search tenantplane docs…"
+               autocomplete="off" data-index="{{ "index.json" | relURL }}" />
+        <div id="search-results" class="search-results"></div>
+      </div>
     </div>
   </section>
 
+  <!-- What is tenantplane: text + illustration card -->
   <section class="container section">
-    <h2 class="section-title">Why tenantplane</h2>
+    <div class="split">
+      <div>
+        <p><strong>tenantplane</strong> is an open source virtual Kubernetes tenant
+        platform for modern platform engineering teams. It provides a lightweight,
+        inspectable control plane for managing virtual tenants while keeping
+        synchronization, isolation, and operations predictable and explainable.</p>
+        <p>Each tenant runs its own small control plane inside a host namespace.
+        tenantplane reconciles it, enforces an explicit isolation boundary, and
+        deterministically maps tenant resources onto the host — recording a
+        decision for every action, so you can always ask <em>why</em> a host
+        object exists.</p>
+      </div>
+      <div class="illus">
+        <img src="{{ "img/orbits.svg" | relURL }}" alt="Tenant clusters orbiting a host control plane, syncing back to the core" loading="lazy" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture -->
+  <section class="section-alt">
+    <div class="container section">
+      <div class="section-head">
+        <span class="section-eyebrow">Architecture</span>
+        <h2>One controller, nothing hidden</h2>
+        <p>Three custom resources reconciled into an isolation boundary, a lightweight control plane, and a deterministic sync of tenant resources onto the host.</p>
+      </div>
+      <div class="diagram">
+        <img src="{{ "img/architecture.svg" | relURL }}" alt="tenantplane architecture: custom resources reconciled by the controller into isolation, a control plane, and deterministic host objects" loading="lazy" />
+        <p class="diagram-caption">The tenantplane controller reconciles TenantCluster, IsolationProfile, and SyncPolicy into host-cluster reality.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature grid -->
+  <section class="container section">
+    <div class="section-head">
+      <span class="section-eyebrow">Why teams choose it</span>
+      <h2>Transparent by design</h2>
+    </div>
     <div class="feature-grid">
       <div class="feature">
         <div class="feature-icon">🔍</div>
         <h3>Explainable sync</h3>
-        <p>Deterministic virtual-to-host mapping with dry-run planning. Ask <em>why</em> any host object exists and get an answer.</p>
+        <p>Deterministic virtual-to-host mapping with offline dry-run planning. Ask <em>why</em> any host object exists and get an answer.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🛡️</div>
@@ -43,7 +80,7 @@
       <div class="feature">
         <div class="feature-icon">🔁</div>
         <h3>Day-2 by design</h3>
-        <p>Reconciliation, drift-aware sync, and decision records built for the operational realities of multi-tenancy.</p>
+        <p>Reconciliation, drift correction, and orphan garbage collection built for the operational realities of multi-tenancy.</p>
       </div>
       <div class="feature">
         <div class="feature-icon">🧭</div>
@@ -58,24 +95,122 @@
     </div>
   </section>
 
-  <section class="container section">
-    <h2 class="section-title">Three resources, one mental model</h2>
-    <div class="card-grid">
-      <a class="card" href="{{ "/docs/concepts/tenantcluster/" | relURL }}">
-        <h3>TenantCluster</h3>
-        <p>The lifecycle of one virtual Kubernetes tenant — shared, dedicated, or private.</p>
-      </a>
-      <a class="card" href="{{ "/docs/concepts/isolationprofile/" | relURL }}">
-        <h3>IsolationProfile</h3>
-        <p>The security and fairness boundary applied around a tenant's workloads.</p>
-      </a>
-      <a class="card" href="{{ "/docs/concepts/syncpolicy/" | relURL }}">
-        <h3>SyncPolicy</h3>
-        <p>Which resources cross the virtual-to-host boundary, and how conflicts resolve.</p>
-      </a>
+  <!-- How sync works -->
+  <section class="section-alt">
+    <div class="container section">
+      <div class="section-head">
+        <span class="section-eyebrow">How sync works</span>
+        <h2>A convergence pass, fully explained</h2>
+        <p>For every resource kind your SyncPolicy marks <code>toHost</code>, the engine runs the same four deterministic steps — and records a decision for each one.</p>
+      </div>
+      <div class="diagram" style="margin-bottom: 40px;">
+        <img src="{{ "img/sync-flow.svg" | relURL }}" alt="Sync convergence pass: list, transform, apply, garbage-collect, with a decision recorded at each step" loading="lazy" />
+      </div>
+      <div class="steps">
+        <div class="step">
+          <span class="step-num">1</span>
+          <h3>List</h3>
+          <p>Enumerate tenant objects of the kind, skipping the tenant's own system namespaces.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">2</span>
+          <h3>Transform</h3>
+          <p>Deep-copy, apply the deterministic host name, merge reverse-mapping metadata, strip host-owned fields.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">3</span>
+          <h3>Apply</h3>
+          <p>Create the host object if absent, otherwise update it in place with a conflict-checked write.</p>
+        </div>
+        <div class="step">
+          <span class="step-num">4</span>
+          <h3>Garbage-collect</h3>
+          <p>Delete managed host objects whose tenant source is gone. Foreign objects are never touched.</p>
+        </div>
+      </div>
     </div>
   </section>
 
+  <!-- Explainability: text + terminal -->
+  <section class="container section">
+    <div class="split">
+      <div>
+        <span class="section-eyebrow">Explainability</span>
+        <h3>Ask why. Get an answer.</h3>
+        <p>Host placement is deterministic, so tenantplane can tell you where a
+        tenant resource will land <strong>before anything is applied</strong> —
+        offline, in CI, or during an audit.</p>
+        <ul>
+          <li><strong>Predict</strong> the host namespace, name, labels, and annotations.</li>
+          <li><strong>Trace</strong> any host object back to its tenant source.</li>
+          <li><strong>Audit</strong> every sync action through decision Events.</li>
+        </ul>
+      </div>
+      <pre class="hero-terminal"><code><span class="c-dim">$</span> tenantplane explain-sync --tenant dev --tenant-namespace team-dev \
+    --virtual-namespace default --kind Pod --name nginx
+<span class="c-key">hostResource:</span>
+  namespace: team-dev
+  name: <span class="c-val">nginx-x-default-x-dev</span>
+<span class="c-key">reason:</span>
+  stable name from resource + virtual namespace + tenant;
+  labels preserve the reverse mapping.</code></pre>
+    </div>
+  </section>
+
+  <!-- Three resources: yaml + text (reversed) -->
+  <section class="section-alt">
+    <div class="container section">
+      <div class="split">
+        <pre class="code-card"><code><span class="c-com"># A tenant, an isolation level, a sync policy</span>
+<span class="c-key">apiVersion:</span> tenantplane.io/v1alpha1
+<span class="c-key">kind:</span> TenantCluster
+<span class="c-key">metadata:</span>
+  <span class="c-key">name:</span> dev
+  <span class="c-key">namespace:</span> team-dev
+<span class="c-key">spec:</span>
+  <span class="c-key">mode:</span> <span class="c-str">shared</span>
+  <span class="c-key">isolationProfileRef:</span> { <span class="c-key">name:</span> restricted }
+  <span class="c-key">syncPolicyRef:</span> { <span class="c-key">name:</span> default }
+  <span class="c-key">controlPlane:</span>
+    <span class="c-key">replicas:</span> 1
+    <span class="c-key">datastore:</span> { <span class="c-key">type:</span> sqlite }</code></pre>
+        <div>
+          <span class="section-eyebrow">One mental model</span>
+          <h3>Three resources, nothing hidden</h3>
+          <p>tenantplane's entire API is three custom resources. Declare intent; the controller makes it real and tells you what it did.</p>
+          <ul>
+            <li><strong><a href="{{ "/docs/concepts/tenantcluster/" | relURL }}">TenantCluster</a></strong> — the lifecycle of one virtual tenant.</li>
+            <li><strong><a href="{{ "/docs/concepts/isolationprofile/" | relURL }}">IsolationProfile</a></strong> — the security and fairness boundary.</li>
+            <li><strong><a href="{{ "/docs/concepts/syncpolicy/" | relURL }}">SyncPolicy</a></strong> — what crosses the boundary, and how.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Use cases -->
+  <section class="container section">
+    <div class="section-head">
+      <span class="section-eyebrow">Where it fits</span>
+      <h2>Built for real platform work</h2>
+    </div>
+    <div class="usecases">
+      <div class="usecase">
+        <h3>Internal developer platforms</h3>
+        <p>Hand every team a cluster-like environment without running a cluster per team.</p>
+      </div>
+      <div class="usecase">
+        <h3>CI &amp; preview environments</h3>
+        <p>High-density, ephemeral tenants that spin up fast and clean up predictably.</p>
+      </div>
+      <div class="usecase">
+        <h3>Regulated &amp; audited estates</h3>
+        <p>Answer “what runs where, and why” with explicit isolation and decision records.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
   <section class="cta-band">
     <div class="container cta-inner">
       <h2>Ready in minutes on a kind cluster</h2>
@@ -83,4 +218,6 @@
       <a class="btn btn-primary" href="{{ "/docs/quickstart/" | relURL }}">Read the quickstart →</a>
     </div>
   </section>
+
+  <script defer src="{{ "js/search.js" | relURL }}"></script>
 {{ end }}

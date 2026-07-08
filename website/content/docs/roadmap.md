@@ -18,6 +18,8 @@ not a commitment to dates or ordering.
 - Deterministic host-ward sync (`toHost`) with orphan garbage collection.
 - Sync decisions recorded as Kubernetes Events.
 - CLI: resource rendering and offline `explain-sync`.
+- Managed Kubernetes support (EKS, AKS, GKE): storage class selection,
+  LoadBalancer exposure with cloud annotations, extra TLS SANs.
 
 ## Next
 
@@ -26,6 +28,9 @@ not a commitment to dates or ordering.
 - **SyncDecision records** — a durable, queryable decision stream beyond Events.
 - **Expanded isolation enforcement** — runtime class, host-path, and privileged
   container controls wired through to admission.
+- **Dedicated control-plane namespaces** — separate the k3s control plane from
+  tenant workloads so Pod Security can be enforced at `restricted` (today the
+  enforce label is capped at `baseline`).
 - **Kubernetes version selection** — map `kubernetesVersion` to a k3s image.
 - **Multi-replica / HA control planes** and non-SQLite datastores.
 
@@ -41,4 +46,4 @@ not a commitment to dates or ordering.
 
 Contributions are welcome across Kubernetes controllers, networking, security,
 observability, docs, and testing. Open an issue or a pull request on
-[GitHub](https://github.com/tenantplane/tenantplane).
+[GitHub](https://github.com/debois-tech/tenantplane).

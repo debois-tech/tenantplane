@@ -5,7 +5,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	"github.com/tenantplane/tenantplane/internal/api/v1alpha1"
+	"github.com/debois-tech/tenantplane/internal/api/v1alpha1"
 )
 
 func runtimeScheme() *runtime.Scheme {

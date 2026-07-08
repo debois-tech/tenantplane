@@ -14,8 +14,29 @@ website/
 │   ├── _index.md        # homepage (rendered by layouts/index.html)
 │   └── docs/            # introduction, quickstart, concepts, guides, reference
 ├── layouts/             # the custom theme (templates + partials)
-└── static/css/          # stylesheet (light/dark, responsive)
+│   └── index.json       # docs search index template (emitted at /index.json)
+└── static/
+    ├── css/             # stylesheet (light/dark, responsive)
+    ├── js/              # search.js (client-side docs search) + copy.js (code copy buttons)
+    └── img/             # architecture diagrams + hero/illustration art (SVG)
 ```
+
+The docs search on the homepage is fully client-side: Hugo renders
+`/index.json` from the docs pages, and `static/js/search.js` filters it in the
+browser — no Algolia or other external service.
+
+The architecture diagrams in `static/img/` are hand-authored SVGs with embedded
+`prefers-color-scheme` styles, so they adapt to light/dark automatically. The
+hero backdrop (`orbit-hero.svg`) and illustration card (`orbits.svg`) use fixed
+dark palettes by design.
+
+## Visual identity
+
+The site uses tenantplane's own "orbit" identity — tenants as satellites
+orbiting a host control plane — with a deep-teal primary and coral accent.
+The layout structure (hero → docs search → alternating content sections) is
+inspired by mature CNCF project sites, but colors, artwork, and patterns are
+original. Palette lives in the `:root` variables of `static/css/style.css`.
 
 ## Prerequisites
 

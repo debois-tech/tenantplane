@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 360" role="img" aria-label="tenantplane isolation modes: shared, dedicated, private" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">
+  <style>
+    .box { fill: #f7f8fb; stroke: #d8dce6; stroke-width: 1.5; }
+    .accent { fill: #e7f4f1; stroke: #0e8276; stroke-width: 2; }
+    .node { fill: #ffffff; stroke: #c4cad6; stroke-width: 1.4; }
+    .t { fill: #1a1c23; }
+    .m { fill: #5b6472; }
+    .a { fill: #0e8276; }
+    .arrow { stroke: #98a2b3; stroke-width: 2; fill: none; }
+    .chip-on { fill: #0e8276; }
+    .chip-off { fill: #98a2b3; }
+    .chipt { fill: #ffffff; font-size: 11px; font-weight: 700; }
+    .dotA { fill: #0e8276; }
+    .dotB { fill: #d95a35; }
+    .dotC { fill: #7ac74f; }
+    text { font-size: 14px; }
+    .small { font-size: 12px; }
+    .tiny { font-size: 11px; }
+    .title { font-weight: 700; font-size: 17px; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161a24; stroke: #2a3040; }
+      .accent { fill: #0f2a2b; stroke: #4dd6c5; }
+      .node { fill: #10131d; stroke: #333a4d; }
+      .t { fill: #e8eaf0; }
+      .m { fill: #9aa4b6; }
+      .a { fill: #5ee6d3; }
+      .arrow { stroke: #4b5468; }
+      .chip-on { fill: #4dd6c5; }
+      .chip-off { fill: #4b5468; }
+      .dotA { fill: #5ee6d3; }
+    }
+  </style>
+  <defs>
+    <marker id="tmah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#98a2b3"/>
+    </marker>
+  </defs>
+
+  <!-- Shared -->
+  <rect class="accent" x="36" y="46" width="272" height="240" rx="13"/>
+  <text class="title a" x="172" y="82" text-anchor="middle">shared</text>
+  <rect class="chip-on" x="118" y="96" width="108" height="22" rx="11"/>
+  <text class="chipt" x="172" y="111" text-anchor="middle">available today</text>
+  <text class="small m" x="172" y="140" text-anchor="middle">tenant workloads on host nodes</text>
+  <text class="small m" x="172" y="158" text-anchor="middle">with software isolation controls</text>
+  <!-- nodes with mixed tenant pods -->
+  <g>
+    <rect class="node" x="66" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotA" cx="84" cy="204" r="6"/><circle class="dotB" cx="108" cy="204" r="6"/>
+    <circle class="dotC" cx="84" cy="226" r="6"/><circle class="dotA" cx="108" cy="226" r="6"/>
+    <rect class="node" x="142" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotB" cx="160" cy="204" r="6"/><circle class="dotA" cx="184" cy="204" r="6"/>
+    <circle class="dotA" cx="160" cy="226" r="6"/><circle class="dotC" cx="184" cy="226" r="6"/>
+    <rect class="node" x="218" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotC" cx="236" cy="204" r="6"/><circle class="dotB" cx="260" cy="204" r="6"/>
+    <circle class="dotB" cx="236" cy="226" r="6"/><circle class="dotA" cx="260" cy="226" r="6"/>
+  </g>
+  <text class="tiny m" x="172" y="268" text-anchor="middle">mixed tenants per node</text>
+
+  <!-- Dedicated -->
+  <rect class="box" x="354" y="46" width="272" height="240" rx="13"/>
+  <text class="title t" x="490" y="82" text-anchor="middle">dedicated</text>
+  <rect class="chip-off" x="454" y="96" width="72" height="22" rx="11"/>
+  <text class="chipt" x="490" y="111" text-anchor="middle">planned</text>
+  <text class="small m" x="490" y="140" text-anchor="middle">tenant-selected node pool,</text>
+  <text class="small m" x="490" y="158" text-anchor="middle">shared infra services</text>
+  <g>
+    <rect class="node" x="384" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotA" cx="402" cy="204" r="6"/><circle class="dotA" cx="426" cy="204" r="6"/>
+    <circle class="dotA" cx="402" cy="226" r="6"/><circle class="dotA" cx="426" cy="226" r="6"/>
+    <rect class="node" x="460" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotA" cx="478" cy="204" r="6"/><circle class="dotA" cx="502" cy="204" r="6"/>
+    <circle class="dotA" cx="478" cy="226" r="6"/><circle class="dotA" cx="502" cy="226" r="6"/>
+    <rect class="node" x="536" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotB" cx="554" cy="204" r="6"/><circle class="dotC" cx="578" cy="204" r="6"/>
+    <circle class="dotC" cx="554" cy="226" r="6"/><circle class="dotB" cx="578" cy="226" r="6"/>
+  </g>
+  <text class="tiny m" x="490" y="268" text-anchor="middle">one tenant per node pool</text>
+
+  <!-- Private -->
+  <rect class="box" x="672" y="46" width="272" height="240" rx="13"/>
+  <text class="title t" x="808" y="82" text-anchor="middle">private</text>
+  <rect class="chip-off" x="772" y="96" width="72" height="22" rx="11"/>
+  <text class="chipt" x="808" y="111" text-anchor="middle">planned</text>
+  <text class="small m" x="808" y="140" text-anchor="middle">separate worker nodes,</text>
+  <text class="small m" x="808" y="158" text-anchor="middle">CNI, and CSI per tenant</text>
+  <g>
+    <rect class="node" x="702" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotA" cx="720" cy="204" r="6"/><circle class="dotA" cx="744" cy="204" r="6"/>
+    <circle class="dotA" cx="720" cy="226" r="6"/><circle class="dotA" cx="744" cy="226" r="6"/>
+    <rect class="node" x="778" y="184" width="60" height="60" rx="10"/>
+    <circle class="dotA" cx="796" cy="204" r="6"/><circle class="dotA" cx="820" cy="204" r="6"/>
+    <circle class="dotA" cx="796" cy="226" r="6"/><circle class="dotA" cx="820" cy="226" r="6"/>
+    <rect class="node" x="854" y="184" width="60" height="60" rx="10"/>
+    <text class="tiny a" x="884" y="209" text-anchor="middle" font-weight="700">CNI</text>
+    <text class="tiny a" x="884" y="228" text-anchor="middle" font-weight="700">CSI</text>
+  </g>
+  <text class="tiny m" x="808" y="268" text-anchor="middle">fully separate data plane</text>
+
+  <!-- migration arrows -->
+  <path class="arrow" d="M310,166 L352,166" marker-end="url(#tmah)"/>
+  <path class="arrow" d="M628,166 L670,166" marker-end="url(#tmah)"/>
+  <text class="tiny m" x="331" y="154" text-anchor="middle">migrate</text>
+  <text class="tiny m" x="649" y="154" text-anchor="middle">migrate</text>
+
+  <text class="small m" x="490" y="330" text-anchor="middle">Tenant API state is preserved across migrations — the TenantCluster is never recreated.</text>
+</svg>

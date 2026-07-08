@@ -127,9 +127,20 @@ func BuildLimitRange(profile Profile, namespace string) *corev1.LimitRange {
 
 // PodSecurityLabels returns the Pod Security Admission labels namespace-scoped
 // enforcement uses for this profile's level.
+//
+// The enforce label is capped at "baseline": the tenant's k3s control-plane pod
+// runs in the same namespace and (like upstream k3s) runs as root, which the
+// "restricted" PSA level rejects — enforcing it would prevent every tenant from
+// starting on PSA-enabled clusters (EKS, AKS, GKE, kind ≥1.25). Audit and warn
+// stay at the profile's level so violations remain visible. Lifting the cap by
+// moving control planes into a dedicated namespace is on the roadmap.
 func PodSecurityLabels(profile Profile) map[string]string {
+	enforce := profile.PodSecurity
+	if enforce == "restricted" {
+		enforce = "baseline"
+	}
 	return map[string]string{
-		"pod-security.kubernetes.io/enforce": profile.PodSecurity,
+		"pod-security.kubernetes.io/enforce": enforce,
 		"pod-security.kubernetes.io/audit":   profile.PodSecurity,
 		"pod-security.kubernetes.io/warn":    profile.PodSecurity,
 	}

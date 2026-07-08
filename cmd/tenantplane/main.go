@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/tenantplane/tenantplane/internal/isolation"
-	"github.com/tenantplane/tenantplane/internal/syncplan"
+	"github.com/debois-tech/tenantplane/internal/isolation"
+	"github.com/debois-tech/tenantplane/internal/syncplan"
 )
 
 const version = "0.1.0-dev"

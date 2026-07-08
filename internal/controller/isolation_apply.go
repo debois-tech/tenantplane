@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/tenantplane/tenantplane/internal/api/v1alpha1"
-	"github.com/tenantplane/tenantplane/internal/isolation"
+	"github.com/debois-tech/tenantplane/internal/api/v1alpha1"
+	"github.com/debois-tech/tenantplane/internal/isolation"
 )
 
 func profileFromCR(cr *v1alpha1.IsolationProfile) isolation.Profile {

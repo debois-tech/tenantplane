@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/tenantplane/tenantplane/internal/api/v1alpha1"
-	"github.com/tenantplane/tenantplane/internal/syncer"
+	"github.com/debois-tech/tenantplane/internal/api/v1alpha1"
+	"github.com/debois-tech/tenantplane/internal/syncer"
 )
 
 // runSync performs one sync convergence pass for tc using the kubeconfig secret

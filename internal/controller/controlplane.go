@@ -9,8 +9,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/tenantplane/tenantplane/internal/api/v1alpha1"
-	"github.com/tenantplane/tenantplane/internal/isolation"
+	"github.com/debois-tech/tenantplane/internal/api/v1alpha1"
+	"github.com/debois-tech/tenantplane/internal/isolation"
 )
 
 // defaultK3sImage is pinned to a known-good k3s release. TenantCluster.spec.kubernetesVersion
@@ -73,12 +73,30 @@ func buildHeadlessService(tc *v1alpha1.TenantCluster) *corev1.Service {
 	}
 }
 
-func buildStatefulSet(tc *v1alpha1.TenantCluster) *appsv1.StatefulSet {
+// buildStatefulSet returns the desired control-plane StatefulSet. It errors only
+// when the TenantCluster carries an unparseable storage size, so a bad spec value
+// degrades the tenant instead of panicking the manager.
+func buildStatefulSet(tc *v1alpha1.TenantCluster) (*appsv1.StatefulSet, error) {
 	name := controlPlaneName(tc)
 	labels := controlPlaneLabels(tc)
 	replicas := int32(tc.Spec.ControlPlane.Replicas)
 	if replicas < 1 {
 		replicas = 1
+	}
+
+	storageSize := resource.MustParse("1Gi")
+	if size := tc.Spec.ControlPlane.Storage.Size; size != "" {
+		parsed, err := resource.ParseQuantity(size)
+		if err != nil {
+			return nil, fmt.Errorf("invalid controlPlane.storage.size %q: %w", size, err)
+		}
+		storageSize = parsed
+	}
+	// nil means "use the cluster's default StorageClass" — the right default on
+	// EKS/AKS/GKE alike, while className pins a specific CSI-backed class.
+	var storageClassName *string
+	if class := tc.Spec.ControlPlane.Storage.ClassName; class != "" {
+		storageClassName = &class
 	}
 
 	fqdn := controlPlaneServiceFQDN(tc)
@@ -90,6 +108,9 @@ func buildStatefulSet(tc *v1alpha1.TenantCluster) *appsv1.StatefulSet {
 		"--write-kubeconfig-mode=644",
 		"--tls-san=" + fqdn,
 		"--tls-san=" + fqdn + ".cluster.local",
+	}
+	for _, san := range tc.Spec.ControlPlane.ExtraTLSSANs {
+		args = append(args, "--tls-san="+san)
 	}
 
 	requests := corev1.ResourceList{
@@ -136,6 +157,12 @@ func buildStatefulSet(tc *v1alpha1.TenantCluster) *appsv1.StatefulSet {
 							VolumeMounts: []corev1.VolumeMount{
 								{Name: "data", MountPath: "/data"},
 							},
+							// k3s needs root (like upstream), but the default
+							// seccomp profile keeps the container within PSA
+							// baseline expectations.
+							SecurityContext: &corev1.SecurityContext{
+								SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
 									TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(apiPort)},
@@ -158,13 +185,49 @@ func buildStatefulSet(tc *v1alpha1.TenantCluster) *appsv1.StatefulSet {
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "data"},
 					Spec: corev1.PersistentVolumeClaimSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						StorageClassName: storageClassName,
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
+								corev1.ResourceStorage: storageSize,
 							},
 						},
 					},
+				},
+			},
+		},
+	}, nil
+}
+
+// externalServiceName is the LoadBalancer Service created when
+// spec.controlPlane.expose.loadBalancer is set.
+func externalServiceName(tc *v1alpha1.TenantCluster) string {
+	return controlPlaneName(tc) + "-external"
+}
+
+// buildExternalService returns the LoadBalancer Service publishing the tenant
+// API server outside the cluster, or nil when exposure is not requested.
+// Cloud-specific behavior (internal LB, NLB, …) comes from the user-supplied
+// annotations, so the same spec works on EKS, AKS, and GKE.
+func buildExternalService(tc *v1alpha1.TenantCluster) *corev1.Service {
+	if !tc.Spec.ControlPlane.Expose.LoadBalancer {
+		return nil
+	}
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        externalServiceName(tc),
+			Namespace:   tc.Namespace,
+			Labels:      controlPlaneLabels(tc),
+			Annotations: tc.Spec.ControlPlane.Expose.Annotations,
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeLoadBalancer,
+			Selector: controlPlaneLabels(tc),
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "https",
+					Port:       apiPort,
+					TargetPort: intstr.FromInt(apiPort),
 				},
 			},
 		},

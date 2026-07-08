@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="tenantplane logo">
+  <!-- tenantplane mark: a tenant satellite orbiting the host control-plane core.
+       Original artwork; teal core, mint orbit, coral satellite. -->
+  <defs>
+    <linearGradient id="tpcore" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14a99a"/>
+      <stop offset="1" stop-color="#0b6a5f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- orbit: back half (passes behind the core) -->
+  <g transform="rotate(-28 32 32)">
+    <path d="M 6 32 A 26 11 0 0 1 58 32" fill="none" stroke="#4dd6c5" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+  </g>
+
+  <!-- control-plane core: hexagonal pod -->
+  <polygon points="32,17 45,24.5 45,39.5 32,47 19,39.5 19,24.5"
+           fill="url(#tpcore)" stroke="#4dd6c5" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="32" cy="32" r="5" fill="#eafff9"/>
+
+  <!-- orbit: front half (passes in front of the core) -->
+  <g transform="rotate(-28 32 32)">
+    <path d="M 6 32 A 26 11 0 0 0 58 32" fill="none" stroke="#4dd6c5" stroke-width="2.6" stroke-linecap="round"/>
+    <!-- tenant satellite riding the orbit -->
+    <circle cx="7.6" cy="35.7" r="4.6" fill="#ff7a52"/>
+    <circle cx="7.6" cy="35.7" r="4.6" fill="none" stroke="#0c1214" stroke-width="1" opacity="0.25"/>
+  </g>
+</svg>

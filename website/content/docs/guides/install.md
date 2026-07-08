@@ -9,7 +9,10 @@ walkthrough, see the [Quickstart](/docs/quickstart/).
 
 ## Requirements
 
-- A Kubernetes cluster (kind, k3s, or any conformant distribution).
+- A Kubernetes cluster (kind, k3s, or any conformant distribution). For managed
+  clouds, see the dedicated guides:
+  [AWS EKS](/docs/guides/deploy-eks/) · [Azure AKS](/docs/guides/deploy-aks/) ·
+  [Google GKE](/docs/guides/deploy-gke/).
 - `kubectl` configured against it.
 - Docker and Go 1.22+ to build the controller image (until published images are
   available).

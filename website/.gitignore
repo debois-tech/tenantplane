@@ -2,3 +2,7 @@
 /public/
 /resources/
 .hugo_build.lock
+
+# Local Hugo binary / download (do not commit — ~100MB)
+/hugo
+/hugo.tar.gz

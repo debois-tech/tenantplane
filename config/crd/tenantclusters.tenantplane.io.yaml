@@ -61,6 +61,31 @@ spec:
                         type:
                           type: string
                           enum: ["sqlite", "etcd", "postgres"]
+                    storage:
+                      type: object
+                      properties:
+                        className:
+                          type: string
+                          description: StorageClass for the control-plane volume (e.g. gp3 on EKS, managed-csi on AKS, standard-rwo on GKE). Empty uses the cluster default.
+                        size:
+                          type: string
+                          description: Requested volume size (default 1Gi).
+                    expose:
+                      type: object
+                      properties:
+                        loadBalancer:
+                          type: boolean
+                          description: Publish the tenant API server through a Service of type LoadBalancer.
+                        annotations:
+                          type: object
+                          additionalProperties:
+                            type: string
+                          description: Annotations applied to the LoadBalancer Service (cloud-specific behavior).
+                    extraTLSSANs:
+                      type: array
+                      items:
+                        type: string
+                      description: Additional TLS subject alternative names for the tenant API server certificate.
                 networking:
                   type: object
                   properties:
@@ -89,6 +114,8 @@ spec:
                 phase:
                   type: string
                 endpoint:
+                  type: string
+                externalEndpoint:
                   type: string
                 conditions:
                   type: array

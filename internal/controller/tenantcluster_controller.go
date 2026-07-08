@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/tenantplane/tenantplane/internal/api/v1alpha1"
+	"github.com/debois-tech/tenantplane/internal/api/v1alpha1"
 )
 
 const (
@@ -85,6 +85,10 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 		return r.degrade(ctx, tc, "ServiceReconcileFailed", err.Error())
 	}
 
+	if err := r.reconcileExternalService(ctx, tc); err != nil {
+		return r.degrade(ctx, tc, "ExternalServiceReconcileFailed", err.Error())
+	}
+
 	sts, err := r.reconcileStatefulSet(ctx, tc)
 	if err != nil {
 		return r.degrade(ctx, tc, "StatefulSetReconcileFailed", err.Error())
@@ -107,6 +111,11 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 
 	tc.Status.Phase = PhaseReady
 	tc.Status.Endpoint = fmt.Sprintf("https://%s:%d", controlPlaneServiceFQDN(tc), apiPort)
+	externalEndpoint, err := r.externalEndpoint(ctx, tc)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+	tc.Status.ExternalEndpoint = externalEndpoint
 	setCondition(tc, "Ready", corev1.ConditionTrue, "ControlPlaneRunning", "")
 
 	// The control plane is Ready per its StatefulSet, but its API server may need
@@ -155,17 +164,82 @@ func (r *TenantClusterReconciler) reconcileService(ctx context.Context, tc *v1al
 	return r.Update(ctx, existing)
 }
 
+// reconcileExternalService creates, updates, or removes the optional
+// LoadBalancer Service publishing the tenant API server, tracking
+// spec.controlPlane.expose across all cloud providers.
+func (r *TenantClusterReconciler) reconcileExternalService(ctx context.Context, tc *v1alpha1.TenantCluster) error {
+	desired := buildExternalService(tc)
+
+	existing := &corev1.Service{}
+	err := r.Get(ctx, types.NamespacedName{Name: externalServiceName(tc), Namespace: tc.Namespace}, existing)
+
+	if desired == nil {
+		// Exposure disabled: remove a previously created Service if present.
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return r.Delete(ctx, existing)
+	}
+
+	if err := controllerutil.SetControllerReference(tc, desired, r.Scheme); err != nil {
+		return err
+	}
+	if apierrors.IsNotFound(err) {
+		return r.Create(ctx, desired)
+	}
+	if err != nil {
+		return err
+	}
+	existing.Labels = desired.Labels
+	existing.Annotations = desired.Annotations
+	existing.Spec.Type = desired.Spec.Type
+	existing.Spec.Ports = desired.Spec.Ports
+	existing.Spec.Selector = desired.Spec.Selector
+	return r.Update(ctx, existing)
+}
+
+// externalEndpoint returns the https address of the LoadBalancer once the cloud
+// provider has provisioned it, or "" while provisioning or when exposure is off.
+func (r *TenantClusterReconciler) externalEndpoint(ctx context.Context, tc *v1alpha1.TenantCluster) (string, error) {
+	if !tc.Spec.ControlPlane.Expose.LoadBalancer {
+		return "", nil
+	}
+	svc := &corev1.Service{}
+	if err := r.Get(ctx, types.NamespacedName{Name: externalServiceName(tc), Namespace: tc.Namespace}, svc); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	for _, ing := range svc.Status.LoadBalancer.Ingress {
+		host := ing.Hostname
+		if host == "" {
+			host = ing.IP
+		}
+		if host != "" {
+			return fmt.Sprintf("https://%s:%d", host, apiPort), nil
+		}
+	}
+	return "", nil
+}
+
 // reconcileStatefulSet only mutates the subset of fields that are safe to change after
 // creation (replicas, pod template, labels); ServiceName/Selector/VolumeClaimTemplates
 // are immutable on StatefulSets once created and are left untouched on update.
 func (r *TenantClusterReconciler) reconcileStatefulSet(ctx context.Context, tc *v1alpha1.TenantCluster) (*appsv1.StatefulSet, error) {
-	desired := buildStatefulSet(tc)
+	desired, err := buildStatefulSet(tc)
+	if err != nil {
+		return nil, err
+	}
 	if err := controllerutil.SetControllerReference(tc, desired, r.Scheme); err != nil {
 		return nil, err
 	}
 
 	existing := &appsv1.StatefulSet{}
-	err := r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
+	err = r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
 	if apierrors.IsNotFound(err) {
 		if err := r.Create(ctx, desired); err != nil {
 			return nil, err

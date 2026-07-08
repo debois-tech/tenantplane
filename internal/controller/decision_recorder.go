@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 
-	"github.com/tenantplane/tenantplane/internal/syncer"
+	"github.com/debois-tech/tenantplane/internal/syncer"
 )
 
 // eventDecisionRecorder surfaces each sync decision as a Kubernetes Event on the

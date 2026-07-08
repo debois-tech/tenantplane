@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 430" role="img" aria-label="tenant control plane anatomy" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif">
+  <style>
+    .box { fill: #f7f8fb; stroke: #d8dce6; stroke-width: 1.5; }
+    .accent { fill: #e7f4f1; stroke: #0e8276; stroke-width: 2; }
+    .amber { fill: #fbeee7; stroke: #d95a35; stroke-width: 1.5; }
+    .chip { fill: #ffffff; stroke: #d8dce6; stroke-width: 1.2; }
+    .container { fill: none; stroke: #c4cad6; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .t { fill: #1a1c23; }
+    .m { fill: #5b6472; }
+    .a { fill: #0e8276; }
+    .arrow { stroke: #98a2b3; stroke-width: 1.8; fill: none; }
+    .dashed { stroke-dasharray: 5 4; }
+    text { font-size: 14px; }
+    .small { font-size: 12px; }
+    .tiny { font-size: 11px; }
+    .cap { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+    .title { font-weight: 700; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161a24; stroke: #2a3040; }
+      .accent { fill: #0f2a2b; stroke: #4dd6c5; }
+      .amber { fill: #2b1b13; stroke: #d95a35; }
+      .chip { fill: #10131d; stroke: #2a3040; }
+      .container { stroke: #333a4d; }
+      .t { fill: #e8eaf0; }
+      .m { fill: #9aa4b6; }
+      .a { fill: #5ee6d3; }
+      .arrow { stroke: #4b5468; }
+    }
+  </style>
+  <defs>
+    <marker id="cpah" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#98a2b3"/>
+    </marker>
+  </defs>
+
+  <!-- Controller -->
+  <rect class="accent" x="36" y="170" width="176" height="90" rx="11"/>
+  <text class="title a" x="124" y="207" text-anchor="middle">tenantplane</text>
+  <text class="title a" x="124" y="227" text-anchor="middle">controller</text>
+
+  <!-- Host namespace container -->
+  <text class="cap m" x="292" y="36">HOST NAMESPACE · team-dev</text>
+  <rect class="container" x="280" y="46" width="664" height="360" rx="14"/>
+
+  <!-- StatefulSet -->
+  <rect class="box" x="312" y="76" width="300" height="230" rx="11"/>
+  <text class="title t" x="462" y="102" text-anchor="middle">StatefulSet</text>
+  <text class="small m" x="462" y="120" text-anchor="middle">dev-control-plane</text>
+
+  <!-- k3s pod -->
+  <rect class="amber" x="336" y="136" width="252" height="120" rx="10"/>
+  <text class="title t" x="462" y="160" text-anchor="middle">k3s pod</text>
+  <rect class="chip" x="352" y="174" width="220" height="30" rx="7"/>
+  <text class="tiny t" x="462" y="193" text-anchor="middle">kube-apiserver · :6443</text>
+  <rect class="chip" x="352" y="212" width="220" height="30" rx="7"/>
+  <text class="tiny t" x="462" y="231" text-anchor="middle">SQLite datastore · /data</text>
+
+  <!-- PVC -->
+  <rect class="chip" x="336" y="266" width="252" height="28" rx="7"/>
+  <text class="tiny m" x="462" y="284" text-anchor="middle">PersistentVolumeClaim · data (1Gi)</text>
+
+  <!-- Headless Service -->
+  <rect class="box" x="668" y="96" width="244" height="84" rx="11"/>
+  <text class="title t" x="790" y="124" text-anchor="middle">Headless Service</text>
+  <text class="tiny m" x="790" y="144" text-anchor="middle">dev-control-plane.team-dev.svc</text>
+  <text class="tiny m" x="790" y="160" text-anchor="middle">:6443 → k3s pod</text>
+
+  <!-- Kubeconfig Secret -->
+  <rect class="amber" x="668" y="222" width="244" height="84" rx="11"/>
+  <text class="title t" x="790" y="250" text-anchor="middle">Secret</text>
+  <text class="tiny m" x="790" y="270" text-anchor="middle">dev-control-plane-kubeconfig</text>
+  <text class="tiny m" x="790" y="286" text-anchor="middle">server rewritten to Service FQDN</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M212,196 C250,196 256,110 310,110" marker-end="url(#cpah)"/>
+  <text class="tiny m" x="236" y="128">reconciles</text>
+
+  <path class="arrow" d="M212,236 C252,236 256,330 306,330 C420,330 560,330 640,330 C700,330 700,312 700,308" marker-end="url(#cpah)"/>
+  <text class="tiny m" x="380" y="348">writes kubeconfig Secret</text>
+
+  <path class="arrow dashed" d="M212,215 C264,215 280,196 334,196" marker-end="url(#cpah)"/>
+  <text class="tiny m" x="238" y="174">exec: read kubeconfig</text>
+
+  <path class="arrow" d="M666,138 C640,138 636,168 614,178" marker-end="url(#cpah)"/>
+  <text class="tiny m" x="622" y="130">selects</text>
+
+  <!-- tenant clients note -->
+  <rect class="chip" x="668" y="352" width="244" height="38" rx="8"/>
+  <text class="tiny m" x="790" y="376" text-anchor="middle">tenant clients connect via the Service FQDN</text>
+  <path class="arrow dashed" d="M790,350 L790,310" marker-end="url(#cpah)"/>
+</svg>

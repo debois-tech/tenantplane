@@ -1,4 +1,4 @@
-.PHONY: build test fmt verify generate manager-image kind-load install-crd deploy site-serve site-build
+.PHONY: build test fmt verify generate manager-image docker-push kind-load install-crd deploy site-serve site-build
 
 IMG ?= tenantplane/manager:dev
 KIND_CLUSTER ?= tenantplane-dev
@@ -19,6 +19,11 @@ generate:
 
 manager-image:
 	docker build -t $(IMG) .
+
+# Push the manager image to a registry (set IMG to your ECR/ACR/Artifact
+# Registry repository, e.g. make docker-push IMG=<registry>/tenantplane/manager:dev).
+docker-push: manager-image
+	docker push $(IMG)
 
 kind-load: manager-image
 	kind load docker-image $(IMG) --name $(KIND_CLUSTER)

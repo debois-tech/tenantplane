@@ -1,0 +1,5 @@
+{{- $docs := where .Site.RegularPages "Section" "docs" -}}
+[{{- range $i, $p := $docs -}}
+{{- if $i }},{{ end -}}
+{"title":{{ $p.Title | jsonify }},"url":{{ $p.RelPermalink | jsonify }},"description":{{ $p.Description | jsonify }},"content":{{ substr $p.Plain 0 600 | jsonify }}}
+{{- end -}}]

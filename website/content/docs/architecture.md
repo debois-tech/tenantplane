@@ -8,6 +8,8 @@ tenantplane separates the **user-facing tenant API** from the **host-cluster
 implementation details**. Everything is driven by three custom resources
 reconciled by a single controller running on the host cluster.
 
+<img src="/img/architecture.svg" alt="tenantplane architecture" style="width:100%;height:auto;margin:1.5rem 0;" />
+
 ## Components
 
 ### The controller
@@ -23,7 +25,13 @@ Each tenant gets a small [k3s](https://k3s.io) control plane running as a
 single-replica StatefulSet in a host namespace, fronted by a headless Service.
 The controller runs k3s with the agent and bundled add-ons disabled so the pod
 is purely an API server + datastore. The datastore is SQLite for the current
-milestone.
+milestone. The control-plane volume honors `spec.controlPlane.storage`
+(StorageClass + size), so the same spec works against the EBS, Azure Disk, and
+Persistent Disk CSI drivers; `spec.controlPlane.expose.loadBalancer` optionally
+publishes the tenant API through a cloud load balancer, with the provisioned
+address reported as `status.externalEndpoint`.
+
+<img src="/img/control-plane.svg" alt="Anatomy of a tenant control plane: StatefulSet, k3s pod, headless Service, and kubeconfig Secret" style="width:100%;height:auto;margin:1rem 0;" />
 
 ### Isolation
 
@@ -40,25 +48,12 @@ resource kind the SyncPolicy marks `toHost`, the engine lists tenant objects,
 maps each to a deterministic host object, applies it, and garbage-collects host
 objects whose tenant source is gone.
 
-## Request flow
+## The sync convergence pass
 
-```
-        apply TenantCluster / IsolationProfile / SyncPolicy
-                              │
-                              ▼
-                   ┌────────────────────┐
-                   │  tenantplane        │  (controller-runtime manager)
-                   │  controller         │
-                   └─────────┬──────────┘
-             ┌───────────────┼─────────────────────────────┐
-             ▼               ▼                             ▼
-      NetworkPolicy    StatefulSet (k3s)              Sync engine
-      ResourceQuota    + headless Service      (virtual client ⇄ host client)
-      LimitRange       + kubeconfig Secret             │
-      PSA labels                                       ▼
-                                              deterministic host objects
-                                              + decision Events
-```
+Once the control plane is Ready, each `toHost` resource kind runs the same four
+deterministic steps, recording a decision at every step:
+
+<img src="/img/sync-flow.svg" alt="tenantplane sync convergence pass" style="width:100%;height:auto;margin:1rem 0;" />
 
 ## Determinism and reverse mapping
 
@@ -73,6 +68,8 @@ This is what makes [`explain-sync`](/docs/guides/explain-sync/) able to predict
 placement before anything is applied.
 
 ## Isolation modes
+
+<img src="/img/tenancy-modes.svg" alt="tenantplane isolation modes: shared, dedicated, and private, with migration paths between them" style="width:100%;height:auto;margin:1rem 0;" />
 
 | Mode | Workloads run on | Status |
 | --- | --- | --- |

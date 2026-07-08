@@ -1,0 +1,45 @@
+# A TenantCluster tuned for managed Kubernetes (EKS / AKS / GKE).
+# Uncomment the storage className for your cloud, or omit it to use the
+# cluster's default StorageClass.
+apiVersion: tenantplane.io/v1alpha1
+kind: TenantCluster
+metadata:
+  name: cloud-dev
+  namespace: team-dev
+spec:
+  mode: shared
+  kubernetesVersion: v1.30.4
+  isolationProfileRef:
+    name: restricted
+  syncPolicyRef:
+    name: default
+  controlPlane:
+    replicas: 1
+    datastore:
+      type: sqlite
+    storage:
+      # className: gp3           # AWS EKS (EBS CSI driver)
+      # className: managed-csi   # Azure AKS
+      # className: standard-rwo  # Google GKE
+      size: 2Gi
+    expose:
+      loadBalancer: true
+      annotations:
+        # AWS: internal NLB
+        # service.beta.kubernetes.io/aws-load-balancer-type: external
+        # service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+        # Azure: internal load balancer
+        # service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+        # GCP: internal load balancer
+        # networking.gke.io/load-balancer-type: "Internal"
+        {}
+    # Add your load balancer's DNS name or IP here (after the first
+    # provisioning) so the tenant API certificate covers it:
+    extraTLSSANs: []
+  networking:
+    egressPolicy: deny-by-default
+  migration:
+    allowModeChange: true
+  resources:
+    cpu: "2"
+    memory: 2Gi

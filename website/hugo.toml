@@ -6,6 +6,10 @@ enableGitInfo = false
 # This project doesn't use tags/categories; keep the output tree clean.
 disableKinds = ["taxonomy", "term"]
 
+# The home page also emits index.json — the client-side docs search index.
+[outputs]
+  home = ["HTML", "JSON"]
+
 # Markdown / syntax highlighting
 [markup]
   [markup.highlight]
@@ -20,7 +24,7 @@ disableKinds = ["taxonomy", "term"]
 [params]
   description = "Open source, inspectable virtual Kubernetes tenants. Deterministic sync, explicit isolation, transparent day-2 operations."
   tagline = "Virtual Kubernetes tenants you can actually explain"
-  githubURL = "https://github.com/tenantplane/tenantplane"
+  githubURL = "https://github.com/debois-tech/tenantplane"
   # Placeholder branding — swap when real assets exist.
   accent = "#4f46e5"
 
@@ -43,7 +47,7 @@ disableKinds = ["taxonomy", "term"]
   weight = 40
 [[menu.main]]
   name = "GitHub"
-  url = "https://github.com/tenantplane/tenantplane"
+  url = "https://github.com/debois-tech/tenantplane"
   weight = 50
   [menu.main.params]
     external = true

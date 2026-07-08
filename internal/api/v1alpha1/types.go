@@ -80,10 +80,34 @@ type TenantClusterSpec struct {
 type ControlPlaneSpec struct {
 	Replicas  int           `json:"replicas"`
 	Datastore DatastoreSpec `json:"datastore"`
+	// Storage configures the control plane's PersistentVolumeClaim. On managed
+	// Kubernetes (EKS/AKS/GKE) the class selects the cloud CSI driver; when
+	// empty, the cluster's default StorageClass is used.
+	Storage StorageSpec `json:"storage,omitempty"`
+	// Expose optionally publishes the tenant API server outside the cluster.
+	Expose ExposeSpec `json:"expose,omitempty"`
+	// ExtraTLSSANs are additional subject alternative names for the tenant API
+	// server certificate, e.g. an external DNS name or load-balancer address.
+	ExtraTLSSANs []string `json:"extraTLSSANs,omitempty"`
 }
 
 type DatastoreSpec struct {
 	Type string `json:"type"`
+}
+
+type StorageSpec struct {
+	ClassName string `json:"className,omitempty"`
+	Size      string `json:"size,omitempty"`
+}
+
+type ExposeSpec struct {
+	// LoadBalancer creates an additional Service of type LoadBalancer in front
+	// of the tenant API server. Cloud-specific behavior (internal vs external,
+	// NLB vs classic, …) is selected via Annotations.
+	LoadBalancer bool `json:"loadBalancer,omitempty"`
+	// Annotations are set on the LoadBalancer Service, e.g.
+	// service.beta.kubernetes.io/aws-load-balancer-type: external.
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type TenantNetworkingSpec struct {
@@ -102,9 +126,12 @@ type TenantResourceRequests struct {
 }
 
 type TenantClusterStatus struct {
-	Phase      string      `json:"phase,omitempty"`
-	Endpoint   string      `json:"endpoint,omitempty"`
-	Conditions []Condition `json:"conditions,omitempty"`
+	Phase    string `json:"phase,omitempty"`
+	Endpoint string `json:"endpoint,omitempty"`
+	// ExternalEndpoint is the load-balancer address of the tenant API server,
+	// populated once spec.controlPlane.expose.loadBalancer has provisioned.
+	ExternalEndpoint string      `json:"externalEndpoint,omitempty"`
+	Conditions       []Condition `json:"conditions,omitempty"`
 }
 
 type IsolationProfileSpec struct {

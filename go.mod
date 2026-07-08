@@ -1,4 +1,4 @@
-module github.com/tenantplane/tenantplane
+module github.com/debois-tech/tenantplane
 
 go 1.22.2
 
