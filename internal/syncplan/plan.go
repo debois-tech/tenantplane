@@ -45,6 +45,11 @@ func Explain(ref ResourceRef) (Plan, error) {
 	}
 
 	hostName := HostName(ref.Name, ref.VirtualNamespace, ref.TenantCluster)
+	// Only the object name is hash-bounded. The host namespace is not synthesized:
+	// it is the tenant's real host namespace, which must already exist and is
+	// therefore already a valid DNS-1123 label (<=63 chars) by Kubernetes API
+	// validation. Hashing it would point objects at a namespace that does not
+	// exist, so it is sanitized but never truncated.
 	return Plan{
 		Input: ref,
 		Host: HostTarget{
@@ -55,6 +60,13 @@ func Explain(ref ResourceRef) (Plan, error) {
 	}, nil
 }
 
+// HostName builds the deterministic host object name. For inputs within the
+// 63-char DNS-1123 limit the mapping is injective; longer inputs are truncated
+// and suffixed with an FNV-32 hash, so the mapping is no longer guaranteed
+// injective — two inputs sharing a truncated prefix could collide (a
+// birthday-bounded event). Collisions are not prevented here but are detected at
+// apply time by the syncer, which refuses to overwrite a host object belonging
+// to a different tenant source. See internal/syncer.applyHost.
 func HostName(resourceName, virtualNamespace, tenantCluster string) string {
 	base := fmt.Sprintf("%s-x-%s-x-%s", resourceName, virtualNamespace, tenantCluster)
 	safe := SanitizeName(base)

@@ -148,6 +148,12 @@ func (e *Engine) SyncToHost(ctx context.Context, res Resource) ([]Decision, erro
 // applyHost creates or updates one host object and returns the decision. It
 // preserves the existing resourceVersion on update so the write is a
 // conflict-checked replacement of the fields tenantplane owns.
+//
+// Before overwriting an existing object it verifies provenance: the host name is
+// deterministic but not injective (long names are hash-truncated), so two
+// distinct tenant objects could in principle target the same host name, and an
+// unrelated object could already occupy it. In either case applyHost refuses to
+// clobber and records an explainable Skip rather than silently destroying data.
 func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *unstructured.Unstructured) (Decision, error) {
 	existing := &unstructured.Unstructured{}
 	existing.SetGroupVersionKind(host.GroupVersionKind())
@@ -166,12 +172,30 @@ func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *
 		return Decision{}, err
 	}
 
+	existingRef, managed := syncplan.ReverseLookup(existing)
+	if !managed {
+		return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
+			Reason: "host name is already occupied by an object tenantplane does not manage"}, nil
+	}
+	if !sameSource(existingRef, ref) {
+		return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
+			Reason: fmt.Sprintf("host name collides with a different tenant object (%s/%s)", existingRef.VirtualNamespace, existingRef.Name)}, nil
+	}
+
 	host.SetResourceVersion(existing.GetResourceVersion())
 	if err := e.HostClient.Update(ctx, host); err != nil {
 		return Decision{}, err
 	}
 	return Decision{Action: ActionUpdate, Kind: ref.Kind, Ref: ref, Host: target,
 		Reason: "reconciled host object to match virtual source"}, nil
+}
+
+// sameSource reports whether an existing host object's reverse-mapped identity
+// refers to the same tenant object we are about to sync.
+func sameSource(a, b syncplan.ResourceRef) bool {
+	return a.TenantCluster == b.TenantCluster &&
+		a.VirtualNamespace == b.VirtualNamespace &&
+		a.Name == b.Name
 }
 
 // collectOrphans deletes host objects tenantplane manages for this tenant and

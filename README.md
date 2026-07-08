@@ -48,6 +48,11 @@ predictability — you should always be able to answer:
 - Which isolation boundary applies to this tenant, and what does it enforce?
 - How can a tenant safely migrate between isolation models?
 
+Running a lightweight control plane per tenant is a pattern the ecosystem already
+uses (vcluster, Kamaji, and others). tenantplane treats that as an implementation
+detail and builds a distinct, **explainability-first** product on top — see
+[Why tenantplane](website/content/docs/why-tenantplane.md) for how it differs.
+
 ## Features
 
 | | |

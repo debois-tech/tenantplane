@@ -208,6 +208,77 @@ func TestSyncToHostLeavesForeignObjectsAlone(t *testing.T) {
 	}
 }
 
+// A non-tenantplane object already sitting at the deterministic host name must
+// not be overwritten — the engine skips it with an explainable decision.
+func TestSyncToHostSkipsForeignObjectAtTargetName(t *testing.T) {
+	scheme := testScheme(t)
+	foreign := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "team-dev",
+			Name:      "app-config-x-default-x-dev",
+			Labels:    map[string]string{"app.kubernetes.io/managed-by": "helm"},
+		},
+		Data: map[string]string{"owner": "helm"},
+	}
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "app-config", map[string]string{"key": "value"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).WithObjects(foreign).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	decisions, err := e.SyncToHost(context.Background(), Resource{GVK: configMapGVK, Direction: DirectionToHost})
+	if err != nil {
+		t.Fatalf("SyncToHost() error = %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionSkip {
+		t.Fatalf("expected 1 skip decision, got %+v", decisions)
+	}
+	cm := getHostConfigMap(t, host, "app-config-x-default-x-dev")
+	if cm.Data["owner"] != "helm" || cm.Data["key"] == "value" {
+		t.Fatalf("foreign object was clobbered: %v", cm.Data)
+	}
+}
+
+// When the deterministic host name is already held by a tenantplane object that
+// maps back to a *different* tenant source (a name collision, e.g. from hash
+// truncation), the engine skips rather than silently overwriting it.
+func TestSyncToHostSkipsCollisionWithDifferentSource(t *testing.T) {
+	scheme := testScheme(t)
+	occupant := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "team-dev",
+			Name:      "app-config-x-default-x-dev",
+			Labels: map[string]string{
+				syncplan.LabelManagedBy:        syncplan.ManagedByValue,
+				syncplan.LabelTenant:           "dev",
+				syncplan.LabelVirtualNamespace: "default",
+				syncplan.LabelKind:             "configmap",
+			},
+			Annotations: map[string]string{
+				syncplan.AnnotationVirtualNamespace: "default",
+				syncplan.AnnotationVirtualName:      "some-other-name",
+			},
+		},
+		Data: map[string]string{"from": "other-source"},
+	}
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "app-config", map[string]string{"key": "value"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).WithObjects(occupant).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	decisions, err := e.SyncToHost(context.Background(), Resource{GVK: configMapGVK, Direction: DirectionToHost})
+	if err != nil {
+		t.Fatalf("SyncToHost() error = %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionSkip {
+		t.Fatalf("expected 1 skip decision, got %+v", decisions)
+	}
+	if cm := getHostConfigMap(t, host, "app-config-x-default-x-dev"); cm.Data["from"] != "other-source" {
+		t.Fatalf("collided object was clobbered: %v", cm.Data)
+	}
+}
+
 func names(list *corev1.ConfigMapList) []string {
 	var out []string
 	for i := range list.Items {

@@ -6,6 +6,7 @@
     <span class="docs-nav-title">Getting started</span>
     <ul>
       {{ range where $docs "File.TranslationBaseName" "introduction" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Introduction</a></li>{{ end }}
+      {{ range where $docs "File.TranslationBaseName" "why-tenantplane" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Why tenantplane</a></li>{{ end }}
       {{ range where $docs "File.TranslationBaseName" "quickstart" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Quickstart</a></li>{{ end }}
       {{ range where $docs "File.TranslationBaseName" "architecture" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Architecture</a></li>{{ end }}
     </ul>

@@ -51,13 +51,26 @@ For each `toHost` resource kind, one pass does:
 2. **Transform** each into its host object: deep-copy, rename/re-namespace,
    merge reverse-mapping metadata, and strip server-populated and host-owned
    fields (`resourceVersion`, `uid`, `ownerReferences`, `status`, …).
-3. **Apply** it — create if absent, otherwise update in place.
+3. **Apply** it — create if absent, otherwise update in place. Before
+   overwriting, the engine checks the existing object's provenance: if it belongs
+   to a *different* tenant source (a name collision) or to no tenantplane source
+   at all (a foreign object occupying the name), it refuses to clobber and records
+   a `Skip` instead.
 4. **Garbage-collect** — delete host objects tenantplane manages for this tenant
    and kind whose tenant source no longer exists. Objects that aren't
    tenantplane-managed are never touched.
 
 Individual object errors are aggregated, so one bad object doesn't abandon the
 rest of the pass.
+
+### Name collisions
+
+The host name is deterministic but not perfectly injective: names over the
+63-character DNS limit are truncated and suffixed with a hash, so two very long
+names could in principle map to the same host name. tenantplane does not pretend
+this can't happen — it makes it *safe*. The apply step above never overwrites an
+object that reverse-maps to a different source, turning a would-be silent
+data-loss into a visible `Skip` decision you can act on.
 
 ## Decisions
 

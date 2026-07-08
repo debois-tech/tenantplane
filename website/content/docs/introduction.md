@@ -39,6 +39,11 @@ and **isolation** — as first-class, visible subsystems.
   tenant clusters.
 - Anyone who has to answer audit questions about what runs where and why.
 
+Coming from vcluster, Kamaji, or Capsule and wondering how tenantplane differs?
+See [Why tenantplane](/docs/why-tenantplane/) — it uses the per-tenant
+control-plane pattern as an implementation detail and builds a distinct,
+explainability-first product on top.
+
 ## Design principles
 
 - Every synchronization decision should be explainable.
