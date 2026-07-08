@@ -91,6 +91,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
   padding: 6px 12px; border-radius: 999px; margin-bottom: 22px;
 }
 .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.hero-note { margin: 20px 0 0; font-size: 14.5px; color: #9fb4af; }
+.hero-note a { color: #5ee6d3; font-weight: 600; }
+.hero-note a:hover { color: #86f0e0; }
 
 /* Docs search, inside the hero */
 .hero-search { position: relative; max-width: 640px; margin: 44px auto 0; text-align: left; }

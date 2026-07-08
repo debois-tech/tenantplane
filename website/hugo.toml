@@ -34,6 +34,10 @@ disableKinds = ["taxonomy", "term"]
   url = "/docs/"
   weight = 10
 [[menu.main]]
+  name = "Why tenantplane"
+  url = "/docs/why-tenantplane/"
+  weight = 15
+[[menu.main]]
   name = "Concepts"
   url = "/docs/concepts/"
   weight = 20
