@@ -3,7 +3,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   {{ $title := .Title }}
   {{ if .IsHome }}
-    <title>{{ .Site.Title }} — {{ .Site.Params.tagline }}</title>
+    <title>{{ .Site.Title }}</title>
   {{ else }}
     <title>{{ $title }} · {{ .Site.Title }}</title>
   {{ end }}
