@@ -9,6 +9,16 @@ document.addEventListener('DOMContentLoaded', function () {
     '<path d="M20 6 9 17l-5-5"/></svg>';
 
   document.querySelectorAll('pre').forEach(function (pre) {
+    // Wrap the <pre> in a non-scrolling container so the button can anchor to
+    // it and stay pinned while the code scrolls horizontally underneath.
+    var wrap = pre.parentNode;
+    if (!wrap || !wrap.classList.contains('code-wrap')) {
+      wrap = document.createElement('div');
+      wrap.className = 'code-wrap';
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+    }
+
     var btn = document.createElement('button');
     btn.className = 'copy-btn';
     btn.type = 'button';
@@ -31,6 +41,6 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
-    pre.appendChild(btn);
+    wrap.appendChild(btn);
   });
 });

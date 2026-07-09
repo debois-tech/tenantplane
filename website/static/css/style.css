@@ -320,17 +320,20 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 .prose blockquote { margin: 1.2rem 0; padding: 2px 18px; border-left: 3px solid var(--accent); color: var(--text-muted); background: var(--bg-soft); border-radius: 0 8px 8px 0; }
 .edit-hint { font-size: 14px; }
 
-/* Copy-to-clipboard icon buttons on code blocks */
-pre { position: relative; }
+/* Copy-to-clipboard icon buttons on code blocks. The button is anchored to a
+   non-scrolling wrapper (.code-wrap) — not the <pre> — so it stays pinned to the
+   top-right while the code scrolls horizontally underneath it. */
+.code-wrap { position: relative; }
 .copy-btn {
-  position: absolute; top: 8px; right: 8px;
+  position: absolute; top: 8px; right: 8px; z-index: 2;
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; padding: 0;
   border: none; border-radius: 7px; cursor: pointer;
-  background: transparent; color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg-code) 88%, transparent);
+  color: var(--text-muted);
   opacity: 0; transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
 }
-pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+.code-wrap:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
 .copy-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 10%, transparent); }
 .copy-btn.copied { color: var(--accent); opacity: 1; }
 @media (hover: none) { .copy-btn { opacity: 0.7; } }
