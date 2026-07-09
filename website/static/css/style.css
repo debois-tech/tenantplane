@@ -76,9 +76,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
   position: relative;
   overflow: hidden;
   background:
-    url("../img/orbit-hero.svg") center bottom / 1400px auto no-repeat,
     radial-gradient(900px 480px at 50% 118%, rgba(26, 170, 148, 0.22), transparent 62%),
     linear-gradient(168deg, #081517 0%, #0a1e22 55%, #0b2628 100%);
+}
+/* Starfield overlay (was a CSS background — moved to an <img> so its dots can
+   drift; SMIL animates in <img> but not in a CSS background). Same placement:
+   1400px wide, centered, anchored to the bottom of the hero. */
+.hero-stars {
+  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 1400px; max-width: none; height: auto; pointer-events: none;
 }
 
 /* Live orbit: CSS-rotated concentric dashed rings with dots that orbit them.
@@ -96,10 +102,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
   content: ""; position: absolute; top: -5px; left: 50%; margin-left: -5px;
   width: 10px; height: 10px; border-radius: 50%;
 }
+/* Orbiting satellites — still moving, but dimmed to sit among the drifting
+   starfield dots instead of glowing brighter than everything else. */
 .hr-sat-1 { width: 360px; height: 360px; animation: hero-spin 46s linear infinite; }
-.hr-sat-1::before { background: #5ee6d3; box-shadow: 0 0 12px rgba(94, 230, 211, 0.7); }
+.hr-sat-1::before { background: #5ee6d3; opacity: 0.5; box-shadow: 0 0 5px rgba(94, 230, 211, 0.3); }
 .hr-sat-2 { width: 620px; height: 620px; animation: hero-spin 78s linear infinite reverse; }
-.hr-sat-2::before { background: #ff8a66; box-shadow: 0 0 12px rgba(255, 138, 102, 0.6); }
+.hr-sat-2::before { background: #ff8a66; opacity: 0.5; box-shadow: 0 0 5px rgba(255, 138, 102, 0.3); }
 @keyframes hero-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .hr, .hr-sat { animation: none; }
