@@ -1,12 +1,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  {{ $title := .Title }}
-  {{ if .IsHome }}
-    <title>{{ .Site.Title }}</title>
-  {{ else }}
-    <title>{{ $title }} · {{ .Site.Title }}</title>
-  {{ end }}
+  <title>{{ .Site.Title }}</title>
   <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}" />
   <link rel="stylesheet" href="{{ "css/style.css" | relURL }}" />
   <link rel="icon" type="image/svg+xml" href="{{ "img/logo.svg" | relURL }}" />

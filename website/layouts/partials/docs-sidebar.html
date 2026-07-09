@@ -1,6 +1,9 @@
 {{ $current := .RelPermalink }}
 <nav class="docs-nav" aria-label="Documentation">
   {{ $docs := where .Site.Pages "Section" "docs" }}
+  <details class="docs-nav-disclosure" open>
+    <summary><span>Documentation menu</span></summary>
+    <div class="docs-nav-body">
 
   <div class="docs-nav-group">
     <span class="docs-nav-title">Getting started</span>
@@ -47,4 +50,21 @@
       {{ range where $docs "File.TranslationBaseName" "roadmap" }}<li><a href="{{ .RelPermalink }}" class="{{ if eq $current .RelPermalink }}active{{ end }}">Roadmap</a></li>{{ end }}
     </ul>
   </div>
+
+    </div>
+  </details>
 </nav>
+<script>
+  // Docs nav: always-open rail on desktop, collapsed toggle on phones.
+  // Default markup is open (works with JS disabled); this closes it below the
+  // sidebar breakpoint and re-syncs when the viewport crosses it.
+  (function () {
+    var det = document.querySelector('.docs-nav-disclosure');
+    if (!det) return;
+    var mq = window.matchMedia('(max-width: 860px)');
+    function sync() { det.open = !mq.matches; }
+    sync();
+    if (mq.addEventListener) mq.addEventListener('change', sync);
+    else if (mq.addListener) mq.addListener(sync);
+  })();
+</script>
