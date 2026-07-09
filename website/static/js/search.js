@@ -67,4 +67,56 @@ document.addEventListener('DOMContentLoaded', function () {
   document.addEventListener('click', function (e) {
     if (e.target !== input && !results.contains(e.target)) close();
   });
+
+  // Animated "typewriter" placeholder that cycles sample queries while the box
+  // is idle. On focus (click) it switches to a stable placeholder; it resumes
+  // on blur if the box is still empty. Honors prefers-reduced-motion.
+  var STATIC_PH = 'Search tenantplane docs…';
+  var SAMPLES = [
+    'Search “explain-sync”…',
+    'Search “isolation profiles”…',
+    'Search “deploy on EKS”…',
+    'Search “TenantCluster”…',
+    'Search “sync policy”…',
+    'Search “quickstart”…'
+  ];
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var tSample = 0, tChar = 0, deleting = false, phTimer = null;
+
+  function typeTick() {
+    var full = SAMPLES[tSample];
+    if (!deleting) {
+      tChar++;
+      input.placeholder = full.slice(0, tChar);
+      if (tChar >= full.length) { deleting = true; phTimer = setTimeout(typeTick, 1500); return; }
+      phTimer = setTimeout(typeTick, 55 + Math.random() * 50);
+    } else {
+      tChar--;
+      input.placeholder = full.slice(0, tChar);
+      if (tChar <= 0) { deleting = false; tSample = (tSample + 1) % SAMPLES.length; phTimer = setTimeout(typeTick, 400); return; }
+      phTimer = setTimeout(typeTick, 28);
+    }
+  }
+
+  function startPlaceholder() {
+    if (reduce || phTimer || document.activeElement === input) return;
+    tChar = 0; deleting = false;
+    typeTick();
+  }
+
+  function stopPlaceholder() { clearTimeout(phTimer); phTimer = null; }
+
+  input.addEventListener('focus', function () {
+    stopPlaceholder();
+    input.placeholder = STATIC_PH;
+  });
+  input.addEventListener('blur', function () {
+    if (!input.value) startPlaceholder();
+  });
+
+  if (reduce) {
+    input.placeholder = STATIC_PH;
+  } else {
+    setTimeout(startPlaceholder, 600); // brief hold so the box isn't blank on load
+  }
 });
