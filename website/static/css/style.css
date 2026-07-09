@@ -384,6 +384,9 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
   .section { padding: 52px 20px; }
   .cta-inner { padding: 48px 20px; }
   .hero-inner { padding: 76px 20px 60px; }
+  /* Hard-cap code blocks to the viewport so long lines scroll inside the block
+     instead of overflowing (belt-and-suspenders with .split > * min-width:0). */
+  .hero-terminal, .code-card { max-width: calc(100vw - 40px); }
 
   /* Docs nav becomes a collapsible toggle on phones. */
   .docs-nav-disclosure > summary {
@@ -406,13 +409,16 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
   .hero-cta { flex-direction: column; align-items: stretch; max-width: 300px; margin: 0 auto; }
   .hero-cta .btn { width: 100%; text-align: center; }
 
+  /* Card rails: the focused card sits centered, with a slice of the previous
+     and next cards peeking on either side. Side padding (10%) lets the first
+     and last cards reach the center too. */
   .feature-grid, .steps {
     display: flex; grid-template-columns: none;
-    overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
-    gap: 16px; margin: 0 -24px; padding: 4px 24px 14px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory;
+    gap: 14px; margin: 0 -20px; padding: 4px 10% 16px; scroll-padding-inline: 10%;
   }
-  .feature-grid > .feature { flex: 0 0 300px; max-width: 85vw; scroll-snap-align: start; }
-  .steps > .step { flex: 0 0 260px; max-width: 85vw; scroll-snap-align: start; }
+  .feature-grid > .feature,
+  .steps > .step { flex: 0 0 80%; max-width: 340px; scroll-snap-align: center; }
 }
 @media (max-width: 560px) {
   /* Keep the first link and the GitHub mark; drop the rest to save room. */
