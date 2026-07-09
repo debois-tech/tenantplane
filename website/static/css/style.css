@@ -59,9 +59,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 .brand-logo { height: 34px; width: 34px; display: block; }
 .brand-mark { font-size: 20px; }
 .brand-name { letter-spacing: -0.01em; font-size: 1.2rem; }
-.nav { display: flex; gap: 22px; }
+.nav { display: flex; align-items: center; gap: 22px; }
 .nav a { color: var(--text-muted); font-size: 15px; font-weight: 500; }
 .nav a:hover { color: var(--text); text-decoration: none; }
+.nav-icon-link {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px;
+}
+.nav-icon-link:hover { border-color: var(--text-muted); }
+.nav-icon-link svg { width: 17px; height: 17px; display: block; }
 
 /* Hero */
 /* Hero — tenantplane's own "orbit" identity: deep-teal space gradient with
@@ -362,5 +368,8 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
   .nav a { font-size: 14px; }
 }
 @media (max-width: 560px) {
-  .nav a:not(:first-child):nth-child(n+4) { display: none; }
+  /* Keep the first link and the GitHub mark; drop the rest to save room. */
+  .nav a:not(:first-child):not(.nav-icon-link) { display: none; }
+  .nav-icon-link span { display: none; }
+  .nav-icon-link { padding: 5px 9px; }
 }

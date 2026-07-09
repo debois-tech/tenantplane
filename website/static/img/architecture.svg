@@ -13,7 +13,10 @@
     text { font-size: 14px; }
     .small { font-size: 12px; }
     .cap { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+    .flow { fill: #0e8276; }
+    .flow-opt { fill: #d95a35; }
     @media (prefers-color-scheme: dark) {
+      .flow { fill: #5ee6d3; }
       .box { fill: #161a24; stroke: #2a3040; }
       .accent { fill: #0f2a2b; stroke: #4dd6c5; }
       .amber { fill: #2b1b13; stroke: #d95a35; }
@@ -107,4 +110,16 @@
   <text class="small m" x="754" y="418" text-anchor="middle">“why does this host object exist?”</text>
   <path class="arrow" d="M668,352 L668,376" marker-end="url(#ah)"/>
   <path class="arrow" d="M874,352 C874,366 800,372 800,376" marker-end="url(#ah)"/>
+  <g class="flow-layer" aria-hidden="true">
+    <circle class="flow" r="3.1"><animateMotion dur="1.36s" begin="-0.00s" repeatCount="indefinite" path="M210,74 C255,74 262,120 298,132"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.75s" repeatCount="indefinite" path="M210,144 L298,144"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.36s" begin="-0.26s" repeatCount="indefinite" path="M210,214 C255,214 262,168 298,156"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.95s" repeatCount="indefinite" path="M480,120 C520,120 528,105 566,105"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.49s" begin="-0.78s" repeatCount="indefinite" path="M480,144 C520,144 528,207 566,207"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="2.31s" begin="-1.87s" repeatCount="indefinite" path="M480,168 C520,168 528,309 566,309"/></circle>
+    <circle class="flow-opt" r="3.1"><animateMotion dur="1.30s" begin="-0.60s" repeatCount="indefinite" path="M768,178 C792,178 800,124 806,102"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.05s" repeatCount="indefinite" path="M768,309 C788,309 792,258 806,258"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.80s" repeatCount="indefinite" path="M668,352 L668,376"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.25s" repeatCount="indefinite" path="M874,352 C874,366 800,372 800,376"/></circle>
+  </g>
 </svg>

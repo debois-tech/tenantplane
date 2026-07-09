@@ -17,7 +17,10 @@
     .small { font-size: 12px; }
     .tiny { font-size: 11px; }
     .title { font-weight: 700; font-size: 17px; }
+    .flow { fill: #0e8276; }
+    .flow-opt { fill: #d95a35; }
     @media (prefers-color-scheme: dark) {
+      .flow { fill: #5ee6d3; }
       .box { fill: #161a24; stroke: #2a3040; }
       .accent { fill: #0f2a2b; stroke: #4dd6c5; }
       .node { fill: #10131d; stroke: #333a4d; }
@@ -104,4 +107,8 @@
   <text class="tiny m" x="649" y="154" text-anchor="middle">migrate</text>
 
   <text class="small m" x="490" y="330" text-anchor="middle">Tenant API state is preserved across migrations — the TenantCluster is never recreated.</text>
+  <g class="flow-layer" aria-hidden="true">
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.00s" repeatCount="indefinite" path="M310,166 L352,166"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.75s" repeatCount="indefinite" path="M628,166 L670,166"/></circle>
+  </g>
 </svg>

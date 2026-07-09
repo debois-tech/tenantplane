@@ -12,7 +12,10 @@
     .cap { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
     .num { font-size: 13px; font-weight: 700; }
     .title { font-weight: 700; }
+    .flow { fill: #0e8276; }
+    .flow-opt { fill: #d95a35; }
     @media (prefers-color-scheme: dark) {
+      .flow { fill: #5ee6d3; }
       .box { fill: #161a24; stroke: #2a3040; }
       .accent { fill: #0f2a2b; stroke: #4dd6c5; }
       .side { fill: #12151d; stroke: #333a4d; }
@@ -85,4 +88,15 @@
   <path class="arrow" d="M430,195 L430,233" marker-end="url(#ah2)"/>
   <path class="arrow" d="M600,195 L600,233" marker-end="url(#ah2)"/>
   <path class="arrow" d="M770,195 L770,233" marker-end="url(#ah2)"/>
+  <g class="flow-layer" aria-hidden="true">
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.00s" repeatCount="indefinite" path="M140,145 L188,145"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.75s" repeatCount="indefinite" path="M330,145 L358,145"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.20s" repeatCount="indefinite" path="M500,145 L528,145"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.95s" repeatCount="indefinite" path="M670,145 L698,145"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.40s" repeatCount="indefinite" path="M840,145 L858,145"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-1.15s" repeatCount="indefinite" path="M260,195 L260,233"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.60s" repeatCount="indefinite" path="M430,195 L430,233"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.05s" repeatCount="indefinite" path="M600,195 L600,233"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.80s" repeatCount="indefinite" path="M770,195 L770,233"/></circle>
+  </g>
 </svg>

@@ -13,7 +13,10 @@
     .tiny { font-size: 11px; }
     .cap { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
     .title { font-weight: 700; }
+    .flow { fill: #0e8276; }
+    .flow-opt { fill: #d95a35; }
     @media (prefers-color-scheme: dark) {
+      .flow { fill: #5ee6d3; }
       .box { fill: #161a24; stroke: #2a3040; }
       .accent { fill: #0f2a2b; stroke: #4dd6c5; }
       .amber { fill: #2b1b13; stroke: #d95a35; }
@@ -78,4 +81,11 @@
   <text class="tiny t" x="794" y="314" text-anchor="middle" font-weight="700">Exempt: control-plane pods</text>
   <text class="tiny m" x="794" y="332" text-anchor="middle">tenantplane.io/isolation-exempt=true</text>
   <text class="tiny m" x="794" y="348" text-anchor="middle">excluded from default-deny</text>
+  <g class="flow-layer" aria-hidden="true">
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.00s" repeatCount="indefinite" path="M232,202 L306,202"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.75s" repeatCount="indefinite" path="M612,98 C644,98 650,140 674,148"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.20s" repeatCount="indefinite" path="M612,168 L674,172"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.95s" repeatCount="indefinite" path="M612,238 C644,238 650,204 674,196"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.40s" repeatCount="indefinite" path="M612,308 C650,308 662,262 676,240"/></circle>
+  </g>
 </svg>

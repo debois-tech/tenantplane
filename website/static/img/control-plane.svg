@@ -15,7 +15,10 @@
     .tiny { font-size: 11px; }
     .cap { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
     .title { font-weight: 700; }
+    .flow { fill: #0e8276; }
+    .flow-opt { fill: #d95a35; }
     @media (prefers-color-scheme: dark) {
+      .flow { fill: #5ee6d3; }
       .box { fill: #161a24; stroke: #2a3040; }
       .accent { fill: #0f2a2b; stroke: #4dd6c5; }
       .amber { fill: #2b1b13; stroke: #d95a35; }
@@ -88,4 +91,11 @@
   <rect class="chip" x="668" y="352" width="244" height="38" rx="8"/>
   <text class="tiny m" x="790" y="376" text-anchor="middle">tenant clients connect via the Service FQDN</text>
   <path class="arrow dashed" d="M790,350 L790,310" marker-end="url(#cpah)"/>
+  <g class="flow-layer" aria-hidden="true">
+    <circle class="flow" r="3.1"><animateMotion dur="1.88s" begin="-0.00s" repeatCount="indefinite" path="M212,196 C250,196 256,110 310,110"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="3.00s" begin="-2.45s" repeatCount="indefinite" path="M212,236 C252,236 256,330 306,330 C420,330 560,330 640,330 C700,330 700,312 700,308"/></circle>
+    <circle class="flow-opt" r="3.1"><animateMotion dur="1.38s" begin="-0.28s" repeatCount="indefinite" path="M212,215 C264,215 280,196 334,196"/></circle>
+    <circle class="flow" r="3.1"><animateMotion dur="1.30s" begin="-0.95s" repeatCount="indefinite" path="M666,138 C640,138 636,168 614,178"/></circle>
+    <circle class="flow-opt" r="3.1"><animateMotion dur="1.30s" begin="-0.40s" repeatCount="indefinite" path="M790,350 L790,310"/></circle>
+  </g>
 </svg>
