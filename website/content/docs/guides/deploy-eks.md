@@ -7,7 +7,7 @@ weight: 24
 This guide deploys tenantplane on an EKS cluster and brings up a tenant backed
 by EBS storage, with optional exposure through an AWS load balancer.
 
-<img src="/img/eks-architecture.svg" alt="tenantplane on Amazon EKS: ECR image pull, controller reconciling a tenant namespace, EBS CSI storage, and optional AWS load balancer exposure" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/eks-architecture.svg" alt="tenantplane on Amazon EKS: ECR image pull, controller reconciling a tenant namespace, EBS CSI storage, and optional AWS load balancer exposure" >}}
 
 ## Prerequisites
 

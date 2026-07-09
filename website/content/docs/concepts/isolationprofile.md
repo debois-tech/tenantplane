@@ -41,7 +41,7 @@ tenantplane ships three levels. The CLI can render each with
 
 ## What the controls become
 
-<img src="/img/isolation-layers.svg" alt="An IsolationProfile compiled into NetworkPolicy, ResourceQuota, LimitRange, and Pod Security layers around tenant workloads" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/isolation-layers.svg" alt="An IsolationProfile compiled into NetworkPolicy, ResourceQuota, LimitRange, and Pod Security layers around tenant workloads" >}}
 
 When a TenantCluster references a profile, the controller compiles its controls
 into concrete namespace-scoped objects:

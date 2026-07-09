@@ -7,7 +7,7 @@ weight: 26
 This guide deploys tenantplane on a GKE Standard cluster with Persistent Disk
 storage and optional exposure through a Google Cloud load balancer.
 
-<img src="/img/gke-architecture.svg" alt="tenantplane on Google GKE: Artifact Registry image pull, controller reconciling a tenant namespace, Persistent Disk CSI storage, and optional Cloud Load Balancer exposure" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/gke-architecture.svg" alt="tenantplane on Google GKE: Artifact Registry image pull, controller reconciling a tenant namespace, Persistent Disk CSI storage, and optional Cloud Load Balancer exposure" >}}
 
 ## Prerequisites
 

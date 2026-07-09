@@ -1,6 +1,13 @@
 {{ define "main" }}
   <!-- Hero: orbit theme — tenants orbiting a host control plane -->
   <section class="hero">
+    <div class="hero-rings" aria-hidden="true">
+      <span class="hr hr-1"></span>
+      <span class="hr hr-2"></span>
+      <span class="hr hr-3"></span>
+      <span class="hr-sat hr-sat-1"></span>
+      <span class="hr-sat hr-sat-2"></span>
+    </div>
     <div class="container hero-inner">
       <div class="hero-wordmark">
         <img class="hero-logo" src="{{ "img/logo.svg" | relURL }}" alt="tenantplane logo" />
@@ -13,7 +20,7 @@
       </div>
       <p class="hero-note">Coming from vcluster or Kamaji? <a href="{{ "/docs/why-tenantplane/" | relURL }}">See how tenantplane is different →</a></p>
       <div class="hero-search">
-        <span class="search-ico">🔍</span>
+        <span class="search-ico">{{ partial "icon.html" "search" }}</span>
         <input id="docs-search" type="search" placeholder="Search tenantplane docs…"
                autocomplete="off" data-index="{{ "index.json" | relURL }}" />
         <div id="search-results" class="search-results"></div>
@@ -64,32 +71,32 @@
     </div>
     <div class="feature-grid">
       <div class="feature">
-        <div class="feature-icon">🔍</div>
+        <div class="feature-icon">{{ partial "icon.html" "explain" }}</div>
         <h3>Explainable sync</h3>
         <p>Deterministic virtual-to-host mapping with offline dry-run planning. Ask <em>why</em> any host object exists and get an answer.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">🛡️</div>
+        <div class="feature-icon">{{ partial "icon.html" "shield" }}</div>
         <h3>Explicit isolation</h3>
         <p>Isolation profiles compose NetworkPolicy, ResourceQuota, LimitRange, and Pod Security into one auditable boundary.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">🪶</div>
+        <div class="feature-icon">{{ partial "icon.html" "layers" }}</div>
         <h3>Lightweight control planes</h3>
         <p>Each tenant runs a small k3s control plane in a host namespace — easy to understand, audit, and extend.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">🔁</div>
+        <div class="feature-icon">{{ partial "icon.html" "cycle" }}</div>
         <h3>Day-2 by design</h3>
         <p>Reconciliation, drift correction, and orphan garbage collection built for the operational realities of multi-tenancy.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">🧭</div>
+        <div class="feature-icon">{{ partial "icon.html" "compass" }}</div>
         <h3>Migration paths</h3>
         <p>Evolve tenants across shared, dedicated, and private isolation models without recreating tenant API state.</p>
       </div>
       <div class="feature">
-        <div class="feature-icon">📈</div>
+        <div class="feature-icon">{{ partial "icon.html" "activity" }}</div>
         <h3>Observable</h3>
         <p>Decisions as Kubernetes Events today; OpenTelemetry and Prometheus on the roadmap.</p>
       </div>

@@ -1,0 +1,81 @@
+{{ define "main" }}
+  {{ $contact := printf "mailto:%s" .Site.Params.contactEmail }}
+  <section class="pricing-hero">
+    <div class="container">
+      <span class="section-eyebrow">Pricing</span>
+      <h1>Open source at the core. Enterprise-ready at the edges.</h1>
+      <p>tenantplane's core is free and Apache&nbsp;2.0 licensed — forever. Team and
+      Enterprise add the operations, security, and support organizations need to run
+      explainable multi-tenancy at scale.</p>
+    </div>
+  </section>
+
+  <section class="container section">
+    <div class="pricing-grid">
+
+      <div class="tier">
+        <h2>Open Source</h2>
+        <div class="tier-price">Free<span>Apache 2.0 · self-hosted</span></div>
+        <p class="tier-sub">For anyone running virtual tenants on their own clusters.</p>
+        <a class="btn btn-primary tier-cta" href="{{ "/docs/quickstart/" | relURL }}">Get started</a>
+        <ul class="tier-list">
+          <li>TenantCluster, IsolationProfile &amp; SyncPolicy APIs</li>
+          <li>Reconciliation controller + k3s control planes</li>
+          <li>Deterministic sync engine with decision Events</li>
+          <li>Isolation profiles: network, quota, limits, pod security</li>
+          <li>CLI with offline <code>explain-sync</code></li>
+          <li>EKS, AKS &amp; GKE deployment guides</li>
+          <li>Community support on GitHub</li>
+        </ul>
+      </div>
+
+      <div class="tier tier-featured">
+        <div class="tier-badge">Early access</div>
+        <h2>Team</h2>
+        <div class="tier-price">Let's talk<span>usage-based</span></div>
+        <p class="tier-sub">For platform teams running tenantplane in production.</p>
+        <a class="btn btn-primary tier-cta" href="{{ $contact }}?subject=tenantplane%20Team%20early%20access">Request early access</a>
+        <ul class="tier-list">
+          <li>Everything in Open Source</li>
+          <li>Durable, queryable decision &amp; audit history</li>
+          <li>Web console for tenants and sync decisions</li>
+          <li>Multi-cluster tenant management</li>
+          <li>Guided upgrades &amp; migrations</li>
+          <li>Priority support</li>
+        </ul>
+      </div>
+
+      <div class="tier">
+        <div class="tier-badge">Early access</div>
+        <h2>Enterprise</h2>
+        <div class="tier-price">Contact us<span>annual</span></div>
+        <p class="tier-sub">For regulated organizations running tenancy at scale.</p>
+        <a class="btn btn-ghost tier-cta" href="{{ $contact }}?subject=tenantplane%20Enterprise">Contact sales</a>
+        <ul class="tier-list">
+          <li>Everything in Team</li>
+          <li>SSO / SAML and fine-grained RBAC</li>
+          <li>Compliance &amp; audit exports</li>
+          <li>Air-gapped deployment</li>
+          <li>Dedicated support SLA &amp; professional services</li>
+          <li>Roadmap influence</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <p class="pricing-note">
+      tenantplane is early. The open-source core is real and free forever; Team and
+      Enterprise capabilities are in active development.
+      <a href="{{ $contact }}?subject=tenantplane%20early%20access">Get in touch</a>
+      for early access and to help shape what we build.
+    </p>
+  </section>
+
+  <section class="cta-band">
+    <div class="container cta-inner">
+      <h2>Building an internal platform on tenantplane?</h2>
+      <p>Tell us what you're building — we'll help you get there and prioritize what matters to you.</p>
+      <a class="btn btn-primary" href="{{ $contact }}?subject=tenantplane">Talk to us →</a>
+    </div>
+  </section>
+{{ end }}

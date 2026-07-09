@@ -1,14 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="700" viewBox="0 0 1400 700">
-  <!-- Hero backdrop: orbital rings + constellation dots. tenantplane's own identity:
-       tenants orbiting a host control plane. Fixed dark palette (hero is always dark). -->
-  <g fill="none" stroke="#2ee6c8">
-    <ellipse cx="700" cy="460" rx="640" ry="250" opacity="0.10" stroke-width="1.5"/>
-    <ellipse cx="700" cy="460" rx="480" ry="185" opacity="0.14" stroke-width="1.5"/>
-    <ellipse cx="700" cy="460" rx="330" ry="125" opacity="0.18" stroke-width="1.5"/>
-    <ellipse cx="700" cy="460" rx="190" ry="70"  opacity="0.22" stroke-width="1.5"/>
-  </g>
+  <!-- Hero backdrop: a starfield only. The orbital rings are rendered as
+       CSS-rotated elements in the page (an SVG used as a CSS background does not
+       animate), so this file stays a static, textured backdrop. -->
 
-  <!-- nodes riding the rings -->
+  <!-- constellation nodes -->
   <g>
     <circle cx="220" cy="392" r="5" fill="#2ee6c8" opacity="0.55"/>
     <circle cx="1105" cy="530" r="4" fill="#2ee6c8" opacity="0.45"/>

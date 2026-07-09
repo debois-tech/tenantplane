@@ -68,12 +68,38 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
    orbital rings and constellation dots (see img/orbit-hero.svg). */
 .hero {
   position: relative;
+  overflow: hidden;
   background:
     url("../img/orbit-hero.svg") center bottom / 1400px auto no-repeat,
     radial-gradient(900px 480px at 50% 118%, rgba(26, 170, 148, 0.22), transparent 62%),
     linear-gradient(168deg, #081517 0%, #0a1e22 55%, #0b2628 100%);
 }
-.hero-inner { position: relative; padding: 104px 24px 88px; text-align: center; }
+
+/* Live orbit: CSS-rotated concentric dashed rings with dots that orbit them.
+   (An SVG used as a CSS background can't animate, so the motion lives here.) */
+.hero-rings { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.hero-rings .hr, .hero-rings .hr-sat {
+  position: absolute; top: 50%; left: 50%; border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+.hr { border: 1.5px dashed rgba(94, 230, 211, 0.16); }
+.hr-1 { width: 360px; height: 360px; animation: hero-spin 46s linear infinite; }
+.hr-2 { width: 620px; height: 620px; border-color: rgba(94, 230, 211, 0.11); animation: hero-spin 78s linear infinite reverse; }
+.hr-3 { width: 900px; height: 900px; border-color: rgba(94, 230, 211, 0.07); animation: hero-spin 120s linear infinite; }
+.hr-sat::before {
+  content: ""; position: absolute; top: -5px; left: 50%; margin-left: -5px;
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.hr-sat-1 { width: 360px; height: 360px; animation: hero-spin 46s linear infinite; }
+.hr-sat-1::before { background: #5ee6d3; box-shadow: 0 0 12px rgba(94, 230, 211, 0.7); }
+.hr-sat-2 { width: 620px; height: 620px; animation: hero-spin 78s linear infinite reverse; }
+.hr-sat-2::before { background: #ff8a66; box-shadow: 0 0 12px rgba(255, 138, 102, 0.6); }
+@keyframes hero-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .hr, .hr-sat { animation: none; }
+}
+
+.hero-inner { position: relative; z-index: 1; padding: 104px 24px 88px; text-align: center; }
 .hero-wordmark {
   display: flex; justify-content: center; align-items: center; gap: 20px;
   font-size: clamp(3rem, 8vw, 5rem); font-weight: 800; letter-spacing: -0.03em;
@@ -97,7 +123,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 
 /* Docs search, inside the hero */
 .hero-search { position: relative; max-width: 640px; margin: 44px auto 0; text-align: left; }
-.search-ico { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 15px; opacity: 0.7; }
+.search-ico { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); display: inline-flex; color: #7f958f; }
+.search-ico svg { width: 17px; height: 17px; }
 #docs-search {
   width: 100%; padding: 14px 18px 14px 46px; font-size: 16px; font-family: var(--font);
   color: #e6eeec; background: rgba(255, 255, 255, 0.07);
@@ -152,6 +179,21 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 .diagram img { display: block; width: 100%; height: auto; }
 .diagram-caption { text-align: center; color: var(--text-muted); font-size: 14px; margin-top: 14px; }
 
+/* Diagrams inside docs prose: full width on desktop, legible + horizontally
+   scrollable on small screens rather than shrinking text into oblivion. */
+.doc-diagram { margin: 1.6rem 0; }
+.doc-diagram-scroll {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-soft);
+  padding: 16px;
+}
+.doc-diagram img { display: block; width: 100%; height: auto; }
+@media (max-width: 720px) {
+  .doc-diagram img { width: auto; min-width: 620px; }
+  .diagram { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .diagram img { min-width: 560px; }
+}
+
 /* Split: text + code */
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; }
 .split h3 { font-size: 1.5rem; letter-spacing: -0.01em; margin: 0 0 14px; }
@@ -194,7 +236,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
 .feature { padding: 26px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-soft); }
-.feature-icon { font-size: 26px; margin-bottom: 10px; }
+.feature-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; margin-bottom: 16px; border-radius: 12px;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.feature-icon svg { width: 24px; height: 24px; }
 .feature h3 { margin: 0 0 8px; font-size: 1.15rem; }
 .feature p { margin: 0; color: var(--text-muted); font-size: 15px; }
 
@@ -266,6 +313,31 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
 .copy-btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 10%, transparent); }
 .copy-btn.copied { color: var(--accent); opacity: 1; }
 @media (hover: none) { .copy-btn { opacity: 0.7; } }
+
+/* Pricing */
+.pricing-hero { text-align: center; padding: 66px 24px 6px; }
+.pricing-hero h1 { font-size: clamp(2rem, 4vw, 2.9rem); letter-spacing: -0.02em; margin: 12px 0 14px; }
+.pricing-hero p { color: var(--text-muted); max-width: 720px; margin: 0 auto; font-size: 1.1rem; }
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; align-items: start; }
+.tier { position: relative; border: 1px solid var(--border); border-radius: 16px; padding: 30px 26px; background: var(--bg); }
+.tier-featured { border-color: var(--accent); box-shadow: 0 16px 44px rgba(12, 80, 70, 0.13); }
+.tier h2 { margin: 0 0 10px; font-size: 1.35rem; }
+.tier-price { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.tier-price span { display: block; font-size: 0.78rem; font-weight: 500; color: var(--text-muted); letter-spacing: 0; margin-top: 4px; }
+.tier-sub { color: var(--text-muted); font-size: 14.5px; margin: 12px 0 18px; min-height: 42px; }
+.tier-cta { display: block; width: 100%; text-align: center; margin-bottom: 22px; box-sizing: border-box; }
+.tier-list { list-style: none; margin: 0; padding: 0; }
+.tier-list li { position: relative; padding: 9px 0 9px 28px; font-size: 14.5px; border-top: 1px solid var(--border); color: var(--text); }
+.tier-list li::before {
+  content: ""; position: absolute; left: 4px; top: 13px; width: 11px; height: 6px;
+  border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg);
+}
+.tier-badge {
+  position: absolute; top: -11px; left: 24px; background: var(--accent-2); color: #fff;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; padding: 4px 11px; border-radius: 999px;
+}
+.pricing-note { text-align: center; color: var(--text-muted); max-width: 680px; margin: 38px auto 0; font-size: 14.5px; }
+@media (max-width: 860px) { .pricing-grid { grid-template-columns: 1fr; } }
 
 /* Footer */
 .site-footer { border-top: 1px solid var(--border); background: var(--bg-soft); margin-top: 40px; }

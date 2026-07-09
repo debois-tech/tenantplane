@@ -63,7 +63,7 @@ kubectl describe tenantcluster dev
 
 ## Lifecycle
 
-<img src="/img/control-plane.svg" alt="What the controller builds for a TenantCluster: StatefulSet, k3s pod, headless Service, and kubeconfig Secret" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/control-plane.svg" alt="What the controller builds for a TenantCluster: StatefulSet, k3s pod, headless Service, and kubeconfig Secret" >}}
 
 When you apply a TenantCluster, the controller:
 

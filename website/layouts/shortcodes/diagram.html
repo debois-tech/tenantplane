@@ -1,0 +1,7 @@
+{{- $src := .Get "src" -}}
+{{- $alt := .Get "alt" -}}
+<figure class="doc-diagram">
+  <div class="doc-diagram-scroll">
+    <img src="{{ $src | relURL }}" alt="{{ $alt }}" loading="lazy" />
+  </div>
+</figure>

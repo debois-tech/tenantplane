@@ -25,6 +25,8 @@ disableKinds = ["taxonomy", "term"]
   description = "Open source, inspectable virtual Kubernetes tenants. Deterministic sync, explicit isolation, transparent day-2 operations."
   tagline = "Virtual Kubernetes tenants you can actually explain"
   githubURL = "https://github.com/debois-tech/tenantplane"
+  # Placeholder — swap for your real sales/contact inbox.
+  contactEmail = "hello@tenantplane.io"
   # Placeholder branding — swap when real assets exist.
   accent = "#4f46e5"
 
@@ -45,6 +47,10 @@ disableKinds = ["taxonomy", "term"]
   name = "Guides"
   url = "/docs/guides/install/"
   weight = 30
+[[menu.main]]
+  name = "Pricing"
+  url = "/pricing/"
+  weight = 35
 [[menu.main]]
   name = "Roadmap"
   url = "/docs/roadmap/"

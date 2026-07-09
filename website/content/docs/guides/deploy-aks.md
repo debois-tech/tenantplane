@@ -7,7 +7,7 @@ weight: 25
 This guide deploys tenantplane on an AKS cluster with Azure Disk storage and
 optional exposure through an Azure load balancer.
 
-<img src="/img/aks-architecture.svg" alt="tenantplane on Azure AKS: ACR image pull, controller reconciling a tenant namespace, Azure Disk CSI storage, and optional Azure load balancer exposure" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/aks-architecture.svg" alt="tenantplane on Azure AKS: ACR image pull, controller reconciling a tenant namespace, Azure Disk CSI storage, and optional Azure load balancer exposure" >}}
 
 ## Prerequisites
 

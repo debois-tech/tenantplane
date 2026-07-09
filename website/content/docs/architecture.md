@@ -8,7 +8,7 @@ tenantplane separates the **user-facing tenant API** from the **host-cluster
 implementation details**. Everything is driven by three custom resources
 reconciled by a single controller running on the host cluster.
 
-<img src="/img/architecture.svg" alt="tenantplane architecture" style="width:100%;height:auto;margin:1.5rem 0;" />
+{{< diagram src="/img/architecture.svg" alt="tenantplane architecture" >}}
 
 ## Components
 
@@ -31,7 +31,7 @@ Persistent Disk CSI drivers; `spec.controlPlane.expose.loadBalancer` optionally
 publishes the tenant API through a cloud load balancer, with the provisioned
 address reported as `status.externalEndpoint`.
 
-<img src="/img/control-plane.svg" alt="Anatomy of a tenant control plane: StatefulSet, k3s pod, headless Service, and kubeconfig Secret" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/control-plane.svg" alt="Anatomy of a tenant control plane: StatefulSet, k3s pod, headless Service, and kubeconfig Secret" >}}
 
 ### Isolation
 
@@ -53,7 +53,7 @@ objects whose tenant source is gone.
 Once the control plane is Ready, each `toHost` resource kind runs the same four
 deterministic steps, recording a decision at every step:
 
-<img src="/img/sync-flow.svg" alt="tenantplane sync convergence pass" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/sync-flow.svg" alt="tenantplane sync convergence pass" >}}
 
 ## Determinism and reverse mapping
 
@@ -69,7 +69,7 @@ placement before anything is applied.
 
 ## Isolation modes
 
-<img src="/img/tenancy-modes.svg" alt="tenantplane isolation modes: shared, dedicated, and private, with migration paths between them" style="width:100%;height:auto;margin:1rem 0;" />
+{{< diagram src="/img/tenancy-modes.svg" alt="tenantplane isolation modes: shared, dedicated, and private, with migration paths between them" >}}
 
 | Mode | Workloads run on | Status |
 | --- | --- | --- |
