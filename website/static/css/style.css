@@ -210,6 +210,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
 
 /* Split: text + code */
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; }
+/* Let grid cells shrink below their content width so a wide code block scrolls
+   inside its own overflow-x:auto instead of pushing the page wider. */
+.split > * { min-width: 0; }
 .split h3 { font-size: 1.5rem; letter-spacing: -0.01em; margin: 0 0 14px; }
 .split p { color: var(--text-muted); margin: 0 0 14px; }
 .split ul { margin: 0; padding-left: 1.1rem; color: var(--text-muted); }
@@ -374,6 +377,20 @@ pre:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
   .doc-content .prose { max-width: 100%; }
   .nav { gap: 14px; }
   .nav a { font-size: 14px; }
+}
+/* Phone: stack the hero CTAs, and turn the card grids into horizontal,
+   snap-scrolling rails — cards keep their shape and size, the row scrolls. */
+@media (max-width: 640px) {
+  .hero-cta { flex-direction: column; align-items: stretch; max-width: 300px; margin: 0 auto; }
+  .hero-cta .btn { width: 100%; text-align: center; }
+
+  .feature-grid, .steps {
+    display: flex; grid-template-columns: none;
+    overflow-x: auto; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    gap: 16px; margin: 0 -24px; padding: 4px 24px 14px;
+  }
+  .feature-grid > .feature { flex: 0 0 300px; max-width: 85vw; scroll-snap-align: start; }
+  .steps > .step { flex: 0 0 260px; max-width: 85vw; scroll-snap-align: start; }
 }
 @media (max-width: 560px) {
   /* Keep the first link and the GitHub mark; drop the rest to save room. */
