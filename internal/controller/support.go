@@ -49,16 +49,9 @@ func setIsolationCondition(tc *v1alpha1.TenantCluster, profile *v1alpha1.Isolati
 		advisory = append(advisory, "apiFairness")
 	}
 
-	var notes []string
 	if len(advisory) > 0 {
-		notes = append(notes, fmt.Sprintf("declared but not yet enforced through admission: %s", strings.Join(advisory, ", ")))
-	}
-	if controls.PodSecurity == "restricted" {
-		notes = append(notes, `podSecurity "restricted" is enforced at "baseline" (audit and warn stay "restricted") until control planes move to a dedicated namespace`)
-	}
-
-	if len(notes) > 0 {
-		setCondition(tc, "IsolationEnforced", corev1.ConditionFalse, "PartiallyEnforced", strings.Join(notes, "; "))
+		setCondition(tc, "IsolationEnforced", corev1.ConditionFalse, "PartiallyEnforced",
+			fmt.Sprintf("declared but not yet enforced through admission: %s", strings.Join(advisory, ", ")))
 		return
 	}
 	setCondition(tc, "IsolationEnforced", corev1.ConditionTrue, "Enforced", "")

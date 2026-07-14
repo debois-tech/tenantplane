@@ -29,17 +29,22 @@ func controlPlaneName(tc *v1alpha1.TenantCluster) string {
 func controlPlaneObjectMeta(tc *v1alpha1.TenantCluster, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,
-		Namespace: tc.Namespace,
+		Namespace: controlPlaneNamespace(tc),
 		Labels:    controlPlaneLabels(tc),
 	}
 }
 
+// controlPlaneLabels label every control-plane object. tenant + tenant-namespace
+// together identify the owning TenantCluster: objects in the control-plane
+// namespace cannot carry an owner reference to it (cross-namespace references
+// are invalid), so watches and teardown resolve ownership through these labels.
 func controlPlaneLabels(tc *v1alpha1.TenantCluster) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/managed-by": "tenantplane",
-		"app.kubernetes.io/name":       "tenantplane-control-plane",
-		"tenantplane.io/tenant":        tc.Name,
-		isolation.ExemptLabelKey:       isolation.ExemptLabelValue,
+		labelManagedBy:           "tenantplane",
+		"app.kubernetes.io/name": "tenantplane-control-plane",
+		labelTenant:              tc.Name,
+		labelTenantNamespace:     tc.Namespace,
+		isolation.ExemptLabelKey: isolation.ExemptLabelValue,
 	}
 }
 
@@ -47,7 +52,7 @@ func controlPlaneLabels(tc *v1alpha1.TenantCluster) map[string]string {
 // the control-plane pod; it doubles as the StatefulSet's governing service and the
 // endpoint published in the tenant kubeconfig.
 func controlPlaneServiceFQDN(tc *v1alpha1.TenantCluster) string {
-	return fmt.Sprintf("%s.%s.svc", controlPlaneName(tc), tc.Namespace)
+	return fmt.Sprintf("%s.%s.svc", controlPlaneName(tc), controlPlaneNamespace(tc))
 }
 
 func buildHeadlessService(tc *v1alpha1.TenantCluster) *corev1.Service {
@@ -56,7 +61,7 @@ func buildHeadlessService(tc *v1alpha1.TenantCluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: tc.Namespace,
+			Namespace: controlPlaneNamespace(tc),
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
@@ -142,7 +147,7 @@ func buildStatefulSet(tc *v1alpha1.TenantCluster) (*appsv1.StatefulSet, error) {
 	return &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: tc.Namespace,
+			Namespace: controlPlaneNamespace(tc),
 			Labels:    labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
@@ -227,7 +232,7 @@ func buildExternalService(tc *v1alpha1.TenantCluster) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        externalServiceName(tc),
-			Namespace:   tc.Namespace,
+			Namespace:   controlPlaneNamespace(tc),
 			Labels:      controlPlaneLabels(tc),
 			Annotations: tc.Spec.ControlPlane.Expose.Annotations,
 		},

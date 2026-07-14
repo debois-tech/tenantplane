@@ -76,17 +76,30 @@ func TestSupportConditionsFlagUnenforcedIsolationControls(t *testing.T) {
 	profile := supportedProfile()
 	profile.Spec.Controls.RuntimeClassName = "gvisor"
 	profile.Spec.Controls.APIFairness = "tenant"
-	profile.Spec.Controls.PodSecurity = "restricted"
 	setSupportConditions(tc, profile, supportedPolicy())
 
 	cond := condition(tc, "IsolationEnforced")
 	if cond == nil || cond.Status != string(corev1.ConditionFalse) {
 		t.Fatalf("IsolationEnforced = %+v, want False", cond)
 	}
-	for _, want := range []string{"runtimeClassName", "apiFairness", "baseline"} {
+	for _, want := range []string{"runtimeClassName", "apiFairness"} {
 		if !strings.Contains(cond.Message, want) {
 			t.Fatalf("message missing %q: %q", want, cond.Message)
 		}
+	}
+}
+
+func TestSupportConditionsRestrictedPSAIsFullyEnforced(t *testing.T) {
+	// With control planes in their own namespace, "restricted" is enforced as
+	// declared and must not degrade the condition.
+	tc := cloudTenant()
+	profile := supportedProfile()
+	profile.Spec.Controls.PodSecurity = "restricted"
+	setSupportConditions(tc, profile, supportedPolicy())
+
+	cond := condition(tc, "IsolationEnforced")
+	if cond == nil || cond.Status != string(corev1.ConditionTrue) {
+		t.Fatalf("IsolationEnforced = %+v, want True", cond)
 	}
 }
 

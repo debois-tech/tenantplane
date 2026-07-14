@@ -86,6 +86,7 @@ func BuildHostObject(ref ResourceRef, tenant *unstructured.Unstructured) (*unstr
 		unstructured.RemoveNestedField(host.Object, "metadata", field)
 	}
 	unstructured.RemoveNestedField(host.Object, "status")
+	stripHostAllocatedSpecFields(ref.Kind, host)
 
 	host.SetNamespace(plan.Host.Namespace)
 	host.SetName(plan.Host.Name)
@@ -93,6 +94,55 @@ func BuildHostObject(ref ResourceRef, tenant *unstructured.Unstructured) (*unstr
 	host.SetAnnotations(mergeMap(host.GetAnnotations(), HostAnnotations(ref)))
 
 	return host, nil
+}
+
+// serviceAllocatedSpecFields are Service spec fields the API server allocates
+// per cluster. A tenant control plane hands out addresses from its own service
+// CIDR (e.g. k3s's 10.43.0.0/16), which the host would reject outright — so
+// they are stripped before create and re-adopted from the live host object
+// before update (clusterIP is immutable once allocated).
+var serviceAllocatedSpecFields = []string{
+	"clusterIP",
+	"clusterIPs",
+	"healthCheckNodePort",
+	"ipFamilies",
+	"ipFamilyPolicy",
+}
+
+func stripHostAllocatedSpecFields(kind string, host *unstructured.Unstructured) {
+	if kind != "Service" {
+		return
+	}
+	for _, field := range serviceAllocatedSpecFields {
+		unstructured.RemoveNestedField(host.Object, "spec", field)
+	}
+	// nodePorts are likewise host-allocated; missing values are (re)assigned by
+	// the host on write, which is the safe behavior for a projected Service.
+	if ports, found, _ := unstructured.NestedSlice(host.Object, "spec", "ports"); found {
+		for i := range ports {
+			if port, ok := ports[i].(map[string]interface{}); ok {
+				delete(port, "nodePort")
+			}
+		}
+		_ = unstructured.SetNestedSlice(host.Object, ports, "spec", "ports")
+	}
+}
+
+// AdoptHostAllocatedFields copies host-allocated Service fields from the live
+// host object onto the desired object before an update: the host's allocator
+// owns them, and clusterIP in particular is immutable, so an update that omits
+// it would be rejected.
+func AdoptHostAllocatedFields(existing, desired *unstructured.Unstructured) {
+	if existing == nil || desired == nil || existing.GetKind() != "Service" {
+		return
+	}
+	for _, field := range serviceAllocatedSpecFields {
+		value, found, _ := unstructured.NestedFieldCopy(existing.Object, "spec", field)
+		if !found {
+			continue
+		}
+		_ = unstructured.SetNestedField(desired.Object, value, "spec", field)
+	}
 }
 
 // ReverseLookup recovers the tenant-side identity of a host object from the

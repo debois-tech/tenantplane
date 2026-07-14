@@ -286,3 +286,48 @@ func names(list *corev1.ConfigMapList) []string {
 	}
 	return out
 }
+
+func TestSyncToHostSkipsVirtualInfrastructure(t *testing.T) {
+	scheme := testScheme(t)
+	apiserverSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "kubernetes"},
+		Spec:       corev1.ServiceSpec{ClusterIP: "10.43.0.1"},
+	}
+	userSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "web"},
+		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 80}}},
+	}
+	rootCA := virtualConfigMap("default", "kube-root-ca.crt", map[string]string{"ca.crt": "..."})
+
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(apiserverSvc, userSvc, rootCA).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+	engine, _ := newEngine(t, virtual, host)
+
+	svcGVK := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}
+	decisions, err := engine.SyncToHost(context.Background(), Resource{GVK: svcGVK, Direction: DirectionToHost})
+	if err != nil {
+		t.Fatalf("SyncToHost(Service) error = %v", err)
+	}
+	for _, d := range decisions {
+		if d.Ref.Name == "kubernetes" {
+			t.Fatalf("the tenant apiserver Service must never be projected onto the host: %+v", d)
+		}
+	}
+	hostSvc := &corev1.Service{}
+	if err := host.Get(context.Background(), client.ObjectKey{Namespace: "team-dev", Name: "web-x-default-x-dev"}, hostSvc); err != nil {
+		t.Fatalf("user Service should still sync: %v", err)
+	}
+	if err := host.Get(context.Background(), client.ObjectKey{Namespace: "team-dev", Name: "kubernetes-x-default-x-dev"}, &corev1.Service{}); err == nil {
+		t.Fatal("host must not have a projected apiserver Service")
+	}
+
+	decisions, err = engine.SyncToHost(context.Background(), Resource{GVK: configMapGVK, Direction: DirectionToHost})
+	if err != nil {
+		t.Fatalf("SyncToHost(ConfigMap) error = %v", err)
+	}
+	for _, d := range decisions {
+		if d.Ref.Name == "kube-root-ca.crt" {
+			t.Fatalf("the root-CA bundle ConfigMap must never be projected onto the host: %+v", d)
+		}
+	}
+}

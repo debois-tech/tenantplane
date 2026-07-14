@@ -90,12 +90,10 @@ func TestPodSecurityLabels(t *testing.T) {
 	restricted, _ := ProfileForLevel("restricted")
 	labels := PodSecurityLabels(restricted)
 
-	// enforce is capped at baseline so the root-running k3s control-plane pod
-	// in the same namespace is not rejected by PSA.
-	if got := labels["pod-security.kubernetes.io/enforce"]; got != "baseline" {
-		t.Fatalf("enforce label = %q, want baseline (capped)", got)
-	}
+	// The declared level is enforced as-is: control planes live in their own
+	// namespace, so the workload namespace no longer caps enforce at baseline.
 	for _, key := range []string{
+		"pod-security.kubernetes.io/enforce",
 		"pod-security.kubernetes.io/audit",
 		"pod-security.kubernetes.io/warn",
 	} {

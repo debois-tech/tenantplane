@@ -18,7 +18,7 @@ rules:
     resources: ["tenantclusters", "tenantclusters/status", "isolationprofiles", "syncpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["namespaces", "serviceaccounts", "services", "configmaps", "secrets", "pods", "resourcequotas", "limitranges", "events"]
+    resources: ["namespaces", "serviceaccounts", "services", "configmaps", "secrets", "pods", "resourcequotas", "limitranges", "events", "persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["pods/exec"]

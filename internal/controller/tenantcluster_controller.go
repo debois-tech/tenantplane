@@ -3,11 +3,13 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -53,6 +55,29 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 		return reconcile.Result{}, err
 	}
 
+	// Deletion: the control-plane namespace cannot be owner-referenced by the
+	// (namespaced) TenantCluster, so a finalizer removes it explicitly.
+	if !tc.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(tc, teardownFinalizer) {
+			return reconcile.Result{}, nil
+		}
+		done, err := r.teardown(ctx, tc)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+		if !done {
+			return reconcile.Result{RequeueAfter: requeueWaiting}, nil
+		}
+		controllerutil.RemoveFinalizer(tc, teardownFinalizer)
+		return reconcile.Result{}, r.Update(ctx, tc)
+	}
+	if !controllerutil.ContainsFinalizer(tc, teardownFinalizer) {
+		controllerutil.AddFinalizer(tc, teardownFinalizer)
+		if err := r.Update(ctx, tc); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
 	isoProfile := &v1alpha1.IsolationProfile{}
 	if err := r.Get(ctx, types.NamespacedName{Name: tc.Spec.IsolationProfileRef.Name}, isoProfile); err != nil {
 		return r.degrade(ctx, tc, "IsolationProfileNotFound", fmt.Sprintf("isolationProfile %q not found: %v", tc.Spec.IsolationProfileRef.Name, err))
@@ -73,6 +98,13 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 	profile := profileFromCR(isoProfile)
 	if err := r.applyIsolation(ctx, tc, profile); err != nil {
 		return r.degrade(ctx, tc, "IsolationApplyFailed", err.Error())
+	}
+
+	if err := r.ensureControlPlaneNamespace(ctx, tc); err != nil {
+		return r.degrade(ctx, tc, "ControlPlaneNamespaceFailed", err.Error())
+	}
+	if err := r.cleanupLegacyControlPlane(ctx, tc); err != nil {
+		return r.degrade(ctx, tc, "LegacyCleanupFailed", err.Error())
 	}
 
 	svc := buildHeadlessService(tc)
@@ -141,10 +173,11 @@ func (r *TenantClusterReconciler) degrade(ctx context.Context, tc *v1alpha1.Tena
 	return reconcile.Result{RequeueAfter: requeueWaiting}, nil
 }
 
+// reconcileService converges the headless Service in the control-plane
+// namespace. Control-plane objects carry identifying labels instead of owner
+// references (cross-namespace owner references are invalid); their lifecycle
+// ends with the control-plane namespace at teardown.
 func (r *TenantClusterReconciler) reconcileService(ctx context.Context, tc *v1alpha1.TenantCluster, desired *corev1.Service) error {
-	if err := controllerutil.SetControllerReference(tc, desired, r.Scheme); err != nil {
-		return err
-	}
 	existing := &corev1.Service{}
 	err := r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
 	if apierrors.IsNotFound(err) {
@@ -166,7 +199,7 @@ func (r *TenantClusterReconciler) reconcileExternalService(ctx context.Context, 
 	desired := buildExternalService(tc)
 
 	existing := &corev1.Service{}
-	err := r.Get(ctx, types.NamespacedName{Name: externalServiceName(tc), Namespace: tc.Namespace}, existing)
+	err := r.Get(ctx, types.NamespacedName{Name: externalServiceName(tc), Namespace: controlPlaneNamespace(tc)}, existing)
 
 	if desired == nil {
 		// Exposure disabled: remove a previously created Service if present.
@@ -179,9 +212,6 @@ func (r *TenantClusterReconciler) reconcileExternalService(ctx context.Context, 
 		return r.Delete(ctx, existing)
 	}
 
-	if err := controllerutil.SetControllerReference(tc, desired, r.Scheme); err != nil {
-		return err
-	}
 	if apierrors.IsNotFound(err) {
 		return r.Create(ctx, desired)
 	}
@@ -203,7 +233,7 @@ func (r *TenantClusterReconciler) externalEndpoint(ctx context.Context, tc *v1al
 		return "", nil
 	}
 	svc := &corev1.Service{}
-	if err := r.Get(ctx, types.NamespacedName{Name: externalServiceName(tc), Namespace: tc.Namespace}, svc); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: externalServiceName(tc), Namespace: controlPlaneNamespace(tc)}, svc); err != nil {
 		if apierrors.IsNotFound(err) {
 			return "", nil
 		}
@@ -229,9 +259,9 @@ func (r *TenantClusterReconciler) reconcileStatefulSet(ctx context.Context, tc *
 	if err != nil {
 		return nil, err
 	}
-	if err := controllerutil.SetControllerReference(tc, desired, r.Scheme); err != nil {
-		return nil, err
-	}
+	// No owner reference: the StatefulSet lives in the control-plane namespace,
+	// and cross-namespace owner references are invalid. Teardown removes the
+	// whole namespace instead.
 
 	existing := &appsv1.StatefulSet{}
 	err = r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
@@ -254,26 +284,47 @@ func (r *TenantClusterReconciler) reconcileStatefulSet(ctx context.Context, tc *
 	return existing, nil
 }
 
+// ensureKubeconfigSecret keeps the tenant kubeconfig in the tenant's own
+// (workload) namespace — that is where users look for it, and an owner
+// reference is valid there. The kubeconfig itself is read from the k3s pod in
+// the control-plane namespace; if an existing Secret points at a stale server
+// address (e.g. from before control planes moved to their own namespace), it
+// is regenerated in place.
 func (r *TenantClusterReconciler) ensureKubeconfigSecret(ctx context.Context, tc *v1alpha1.TenantCluster, name string) (*corev1.Secret, error) {
+	fqdn := controlPlaneServiceFQDN(tc)
+
 	existing := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: tc.Namespace}, existing)
-	if err == nil {
+	if err == nil && strings.Contains(string(existing.Data["kubeconfig"]), fqdn) {
 		return existing, nil
 	}
-	if !apierrors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
-	raw, err := execInPod(ctx, r.RESTConfig, r.ClientSet, tc.Namespace, controlPlanePodName(tc), "k3s",
+	raw, execErr := execInPod(ctx, r.RESTConfig, r.ClientSet, controlPlaneNamespace(tc), controlPlanePodName(tc), "k3s",
 		[]string{"cat", "/etc/rancher/k3s/k3s.yaml"})
-	if err != nil {
-		return nil, fmt.Errorf("read kubeconfig from control-plane pod: %w", err)
+	if execErr != nil {
+		return nil, fmt.Errorf("read kubeconfig from control-plane pod: %w", execErr)
 	}
 
-	kubeconfig := rewriteKubeconfigServer(raw, controlPlaneServiceFQDN(tc))
+	kubeconfig := rewriteKubeconfigServer(raw, fqdn)
+
+	if err == nil {
+		// Stale server address: refresh the existing Secret in place.
+		existing.Data = map[string][]byte{"kubeconfig": []byte(kubeconfig)}
+		if err := r.Update(ctx, existing); err != nil {
+			return nil, err
+		}
+		return existing, nil
+	}
 
 	secret := &corev1.Secret{
-		ObjectMeta: controlPlaneObjectMeta(tc, name),
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: tc.Namespace,
+			Labels:    controlPlaneLabels(tc),
+		},
 		Data: map[string][]byte{
 			"kubeconfig": []byte(kubeconfig),
 		},
@@ -285,6 +336,58 @@ func (r *TenantClusterReconciler) ensureKubeconfigSecret(ctx context.Context, tc
 		return nil, err
 	}
 	return secret, nil
+}
+
+// cleanupLegacyControlPlane removes control-plane objects created by earlier
+// versions of tenantplane directly in the workload namespace, now that control
+// planes live in their own namespace. Only objects carrying tenantplane's
+// control-plane labels for this tenant are touched.
+func (r *TenantClusterReconciler) cleanupLegacyControlPlane(ctx context.Context, tc *v1alpha1.TenantCluster) error {
+	if tc.Namespace == controlPlaneNamespace(tc) {
+		return nil
+	}
+
+	isLegacy := func(labels map[string]string) bool {
+		return labels[labelManagedBy] == "tenantplane" &&
+			labels["app.kubernetes.io/name"] == "tenantplane-control-plane" &&
+			labels[labelTenant] == tc.Name
+	}
+
+	sts := &appsv1.StatefulSet{}
+	if err := r.Get(ctx, types.NamespacedName{Name: controlPlaneName(tc), Namespace: tc.Namespace}, sts); err == nil {
+		if isLegacy(sts.Labels) {
+			if err := r.Delete(ctx, sts); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	for _, name := range []string{controlPlaneName(tc), externalServiceName(tc)} {
+		svc := &corev1.Service{}
+		if err := r.Get(ctx, types.NamespacedName{Name: name, Namespace: tc.Namespace}, svc); err == nil {
+			if isLegacy(svc.Labels) {
+				if err := r.Delete(ctx, svc); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+		} else if !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// The StatefulSet's volumeClaimTemplate PVC survives StatefulSet deletion.
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := r.Get(ctx, types.NamespacedName{Name: "data-" + controlPlanePodName(tc), Namespace: tc.Namespace}, pvc); err == nil {
+		if err := r.Delete(ctx, pvc); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	} else if !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	return nil
 }
 
 func (r *TenantClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -312,12 +415,32 @@ func (r *TenantClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.TenantCluster{}).
-		Owns(&appsv1.StatefulSet{}).
-		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
+		// Control-plane StatefulSets/Services live in a separate namespace and
+		// cannot be owner-referenced by the TenantCluster; map them back to
+		// their tenant through the identifying labels instead.
+		Watches(&appsv1.StatefulSet{}, handler.EnqueueRequestsFromMapFunc(mapControlPlaneObject)).
+		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(mapControlPlaneObject)).
 		Watches(&v1alpha1.IsolationProfile{}, handler.EnqueueRequestsFromMapFunc(r.mapForIndex(isoProfileIndexKey))).
 		Watches(&v1alpha1.SyncPolicy{}, handler.EnqueueRequestsFromMapFunc(r.mapForIndex(syncPolicyIndexKey))).
 		Complete(r)
+}
+
+// mapControlPlaneObject resolves a control-plane object back to its owning
+// TenantCluster through the tenant / tenant-namespace labels.
+func mapControlPlaneObject(_ context.Context, obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if labels[labelManagedBy] != "tenantplane" {
+		return nil
+	}
+	tenant := labels[labelTenant]
+	tenantNamespace := labels[labelTenantNamespace]
+	if tenant == "" || tenantNamespace == "" {
+		return nil
+	}
+	return []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Name: tenant, Namespace: tenantNamespace}},
+	}
 }
 
 func (r *TenantClusterReconciler) mapForIndex(indexKey string) handler.MapFunc {

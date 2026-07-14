@@ -171,3 +171,80 @@ func TestReverseLookupSurvivesHashedName(t *testing.T) {
 		t.Fatalf("ReverseLookup() name = %q (ok=%v), want %q", got.Name, ok, ref.Name)
 	}
 }
+
+func TestBuildHostObjectStripsServiceAllocatedFields(t *testing.T) {
+	ref := devRef()
+	ref.Kind = "Service"
+	ref.Name = "kubernetes"
+
+	tenant := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"metadata":   map[string]interface{}{"name": "kubernetes", "namespace": "default"},
+		"spec": map[string]interface{}{
+			"clusterIP":      "10.43.0.1",
+			"clusterIPs":     []interface{}{"10.43.0.1"},
+			"ipFamilies":     []interface{}{"IPv4"},
+			"ipFamilyPolicy": "SingleStack",
+			"ports": []interface{}{
+				map[string]interface{}{"port": int64(443), "nodePort": int64(31234)},
+			},
+		},
+	}}
+
+	host, err := BuildHostObject(ref, tenant)
+	if err != nil {
+		t.Fatalf("BuildHostObject() error = %v", err)
+	}
+
+	for _, field := range serviceAllocatedSpecFields {
+		if _, found, _ := unstructured.NestedFieldNoCopy(host.Object, "spec", field); found {
+			t.Fatalf("spec.%s must be stripped: the tenant's allocator assigned it, not the host's", field)
+		}
+	}
+	ports, _, _ := unstructured.NestedSlice(host.Object, "spec", "ports")
+	if _, has := ports[0].(map[string]interface{})["nodePort"]; has {
+		t.Fatal("spec.ports[].nodePort must be stripped")
+	}
+	if port := ports[0].(map[string]interface{})["port"]; port != int64(443) {
+		t.Fatalf("spec.ports[].port = %v, want 443 (only allocator fields are stripped)", port)
+	}
+}
+
+func TestAdoptHostAllocatedFields(t *testing.T) {
+	existing := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"spec": map[string]interface{}{
+			"clusterIP":  "10.96.5.7",
+			"clusterIPs": []interface{}{"10.96.5.7"},
+		},
+	}}
+	desired := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Service",
+		"spec":       map[string]interface{}{"selector": map[string]interface{}{"app": "web"}},
+	}}
+
+	AdoptHostAllocatedFields(existing, desired)
+
+	if got, _, _ := unstructured.NestedString(desired.Object, "spec", "clusterIP"); got != "10.96.5.7" {
+		t.Fatalf("clusterIP = %q, want the host-allocated 10.96.5.7 (immutable on update)", got)
+	}
+	if sel, _, _ := unstructured.NestedMap(desired.Object, "spec", "selector"); sel["app"] != "web" {
+		t.Fatal("adoption must not clobber tenant-owned spec fields")
+	}
+
+	// Non-Services are untouched.
+	cm := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"spec": map[string]interface{}{"clusterIP": "10.96.9.9"},
+	}}
+	out := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1", "kind": "ConfigMap", "spec": map[string]interface{}{},
+	}}
+	AdoptHostAllocatedFields(cm, out)
+	if _, found, _ := unstructured.NestedFieldNoCopy(out.Object, "spec", "clusterIP"); found {
+		t.Fatal("AdoptHostAllocatedFields must only act on Services")
+	}
+}

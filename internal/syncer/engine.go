@@ -114,6 +114,9 @@ func (e *Engine) SyncToHost(ctx context.Context, res Resource) ([]Decision, erro
 		if e.skip(obj.GetNamespace()) {
 			continue
 		}
+		if isVirtualInfrastructure(res.GVK.Kind, obj) {
+			continue
+		}
 
 		ref := e.refFor(res.GVK.Kind, obj)
 		host, err := syncplan.BuildHostObject(ref, obj)
@@ -183,6 +186,7 @@ func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *
 	}
 
 	host.SetResourceVersion(existing.GetResourceVersion())
+	syncplan.AdoptHostAllocatedFields(existing, host)
 	if err := e.HostClient.Update(ctx, host); err != nil {
 		return Decision{}, err
 	}
@@ -252,6 +256,21 @@ func (e *Engine) skip(namespace string) bool {
 		return e.SkipNamespaces[namespace]
 	}
 	return defaultSkipNamespaces[namespace]
+}
+
+// isVirtualInfrastructure reports objects every Kubernetes cluster materializes
+// as part of its own API machinery: the apiserver's Service (and Endpoints) in
+// "default", and the per-namespace root-CA bundle ConfigMap. They describe the
+// tenant control plane itself, not tenant workloads, so — like the system
+// namespaces — they are never projected onto the host.
+func isVirtualInfrastructure(kind string, obj *unstructured.Unstructured) bool {
+	switch kind {
+	case "Service", "Endpoints":
+		return obj.GetNamespace() == "default" && obj.GetName() == "kubernetes"
+	case "ConfigMap":
+		return obj.GetName() == "kube-root-ca.crt"
+	}
+	return false
 }
 
 func (e *Engine) record(ctx context.Context, d Decision) {
