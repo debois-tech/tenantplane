@@ -58,6 +58,37 @@ func TestBuildStatefulSetRejectsBadStorageSize(t *testing.T) {
 	}
 }
 
+func TestBuildStatefulSetRejectsBadResourceQuantities(t *testing.T) {
+	tc := cloudTenant()
+	tc.Spec.Resources.CPU = "two cores"
+	if _, err := buildStatefulSet(tc); err == nil {
+		t.Fatal("expected error for invalid resources.cpu, got nil (a panic here would crash the manager)")
+	}
+
+	tc = cloudTenant()
+	tc.Spec.Resources.Memory = "1GB please"
+	if _, err := buildStatefulSet(tc); err == nil {
+		t.Fatal("expected error for invalid resources.memory, got nil (a panic here would crash the manager)")
+	}
+}
+
+func TestBuildStatefulSetValidResourceQuantities(t *testing.T) {
+	tc := cloudTenant()
+	tc.Spec.Resources.CPU = "500m"
+	tc.Spec.Resources.Memory = "512Mi"
+	sts, err := buildStatefulSet(tc)
+	if err != nil {
+		t.Fatalf("buildStatefulSet() error = %v", err)
+	}
+	limits := sts.Spec.Template.Spec.Containers[0].Resources.Limits
+	if got := limits[corev1.ResourceCPU]; got.String() != "500m" {
+		t.Fatalf("cpu limit = %s, want 500m", got.String())
+	}
+	if got := limits[corev1.ResourceMemory]; got.String() != "512Mi" {
+		t.Fatalf("memory limit = %s, want 512Mi", got.String())
+	}
+}
+
 func TestBuildStatefulSetExtraTLSSANs(t *testing.T) {
 	tc := cloudTenant()
 	tc.Spec.ControlPlane.ExtraTLSSANs = []string{"tenants.example.internal", "10.0.12.34"}

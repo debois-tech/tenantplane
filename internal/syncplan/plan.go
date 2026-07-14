@@ -120,4 +120,3 @@ func fnv32(value string) string {
 	}
 	return fmt.Sprintf("%08x", hash)
 }
-

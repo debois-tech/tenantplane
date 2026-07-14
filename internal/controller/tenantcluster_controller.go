@@ -63,12 +63,7 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 		return r.degrade(ctx, tc, "SyncPolicyNotFound", fmt.Sprintf("syncPolicy %q not found: %v", tc.Spec.SyncPolicyRef.Name, err))
 	}
 
-	if tc.Spec.Mode != v1alpha1.TenantModeShared {
-		setCondition(tc, "ModeSupported", corev1.ConditionFalse, "NotImplemented",
-			fmt.Sprintf("mode %q is accepted but only %q is implemented; reconciling as shared", tc.Spec.Mode, v1alpha1.TenantModeShared))
-	} else {
-		setCondition(tc, "ModeSupported", corev1.ConditionTrue, "Shared", "")
-	}
+	setSupportConditions(tc, isoProfile, syncPolicy)
 
 	if tc.Spec.ControlPlane.Datastore.Type != "sqlite" {
 		return r.degrade(ctx, tc, "DatastoreNotImplemented",

@@ -121,11 +121,22 @@ func buildStatefulSet(tc *v1alpha1.TenantCluster) (*appsv1.StatefulSet, error) {
 		corev1.ResourceCPU:    resource.MustParse("1"),
 		corev1.ResourceMemory: resource.MustParse("1Gi"),
 	}
+	// User-supplied quantities are parsed, never MustParse'd: the CRD pattern
+	// validates them at admission, but objects stored before that validation
+	// existed must degrade the tenant, not panic the manager.
 	if cpu := tc.Spec.Resources.CPU; cpu != "" {
-		limits[corev1.ResourceCPU] = resource.MustParse(cpu)
+		parsed, err := resource.ParseQuantity(cpu)
+		if err != nil {
+			return nil, fmt.Errorf("invalid resources.cpu %q: %w", cpu, err)
+		}
+		limits[corev1.ResourceCPU] = parsed
 	}
 	if mem := tc.Spec.Resources.Memory; mem != "" {
-		limits[corev1.ResourceMemory] = resource.MustParse(mem)
+		parsed, err := resource.ParseQuantity(mem)
+		if err != nil {
+			return nil, fmt.Errorf("invalid resources.memory %q: %w", mem, err)
+		}
+		limits[corev1.ResourceMemory] = parsed
 	}
 
 	return &appsv1.StatefulSet{

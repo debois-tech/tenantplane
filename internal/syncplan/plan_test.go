@@ -34,4 +34,3 @@ func TestSanitizeName(t *testing.T) {
 		t.Fatalf("SanitizeName() = %q, want team-a-dev", got)
 	}
 }
-

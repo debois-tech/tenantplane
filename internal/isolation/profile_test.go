@@ -34,4 +34,3 @@ func TestProfileForLevelRejectsUnknown(t *testing.T) {
 		t.Fatal("expected error for unknown isolation level")
 	}
 }
-

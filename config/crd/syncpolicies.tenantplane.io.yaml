@@ -33,6 +33,8 @@ spec:
                       type: boolean
                     interval:
                       type: string
+                      description: Go-style duration (e.g. 30s, 5m, 1h).
+                      pattern: '^[0-9]+(ms|s|m|h)$'
                 explain:
                   type: object
                   properties:
@@ -49,9 +51,15 @@ spec:
                     properties:
                       apiVersion:
                         type: string
+                        description: Core-group version (v1) or group/version (apps/v1). Validated so an unparseable entry cannot be silently dropped at sync time.
+                        pattern: '^([a-z0-9]([a-z0-9.-]*[a-z0-9])?/)?v[0-9]+((alpha|beta)[0-9]+)?$'
                       kind:
                         type: string
+                        pattern: '^[A-Z][A-Za-z0-9]*$'
                       direction:
                         type: string
                         enum: ["toHost", "fromHost", "bidirectional"]
+                        x-kubernetes-validations:
+                          - rule: "self == 'toHost'"
+                            message: 'only "toHost" is implemented today; "fromHost" and "bidirectional" are on the roadmap and are rejected rather than silently skipped'
 

@@ -10,7 +10,7 @@ type Profile struct {
 	RuntimeClassName          string
 	BlockHostPathVolumes      bool
 	BlockPrivilegedContainers bool
-	APIFairness              string
+	APIFairness               string
 }
 
 func ProfileForLevel(level string) (Profile, error) {
@@ -21,7 +21,7 @@ func ProfileForLevel(level string) (Profile, error) {
 			PodSecurity:              "baseline",
 			DefaultDenyNetworkPolicy: false,
 			RequireResourceRequests:  true,
-			APIFairness:             "tenant",
+			APIFairness:              "tenant",
 		}, nil
 	case "restricted":
 		return Profile{
@@ -31,7 +31,7 @@ func ProfileForLevel(level string) (Profile, error) {
 			RequireResourceRequests:   true,
 			BlockHostPathVolumes:      true,
 			BlockPrivilegedContainers: true,
-			APIFairness:              "tenant",
+			APIFairness:               "tenant",
 		}, nil
 	case "sandboxed":
 		return Profile{
@@ -42,10 +42,9 @@ func ProfileForLevel(level string) (Profile, error) {
 			RuntimeClassName:          "kata-qemu",
 			BlockHostPathVolumes:      true,
 			BlockPrivilegedContainers: true,
-			APIFairness:              "tenant-strict",
+			APIFairness:               "tenant-strict",
 		}, nil
 	default:
 		return Profile{}, fmt.Errorf("unknown isolation level %q", level)
 	}
 }
-

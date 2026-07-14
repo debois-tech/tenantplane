@@ -64,7 +64,7 @@ func renderTenantCluster(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("render tenantcluster", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	namespace := fs.String("namespace", "tenantplane-system", "host namespace for the tenant control plane")
-	mode := fs.String("mode", "shared", "tenant mode: shared, dedicated, or private")
+	mode := fs.String("mode", "shared", `tenant mode (only "shared" is implemented; "dedicated" and "private" are on the roadmap)`)
 	isolationProfile := fs.String("isolation-profile", "restricted", "IsolationProfile name")
 	syncPolicy := fs.String("sync-policy", "default", "SyncPolicy name")
 	kubernetesVersion := fs.String("kubernetes-version", "v1.35.0", "tenant Kubernetes version")
@@ -79,8 +79,12 @@ func renderTenantCluster(args []string, stdout io.Writer) error {
 	if err := requireDNSName(name, "tenant cluster name"); err != nil {
 		return err
 	}
-	if err := requireOneOf(*mode, "mode", "shared", "dedicated", "private"); err != nil {
-		return err
+	switch *mode {
+	case "shared":
+	case "dedicated", "private":
+		return fmt.Errorf("mode %q is not implemented yet (the API server would reject it); only \"shared\" is supported today", *mode)
+	default:
+		return fmt.Errorf("mode must be one of: shared (dedicated and private are on the roadmap)")
 	}
 
 	fmt.Fprintf(stdout, `apiVersion: tenantplane.io/v1alpha1
@@ -181,13 +185,13 @@ spec:
       direction: toHost
     - apiVersion: v1
       kind: Service
-      direction: bidirectional
+      direction: toHost
     - apiVersion: v1
       kind: ConfigMap
-      direction: bidirectional
+      direction: toHost
     - apiVersion: v1
       kind: Secret
-      direction: bidirectional
+      direction: toHost
 `, name, *conflictPolicy)
 	return nil
 }
@@ -257,7 +261,7 @@ func printUsage(w io.Writer) {
 
 Usage:
   tenantplane version
-  tenantplane render tenantcluster NAME [--namespace ns] [--mode shared|dedicated|private]
+  tenantplane render tenantcluster NAME [--namespace ns] [--mode shared]
   tenantplane render isolationprofile NAME [--level baseline|restricted|sandboxed]
   tenantplane render syncpolicy NAME [--conflict-policy manual|tenant-wins|host-wins]
   tenantplane explain-sync --tenant NAME --tenant-namespace NS --name RESOURCE_NAME [--kind Pod]`)
@@ -288,4 +292,3 @@ func yamlString(value string) string {
 	}
 	return value
 }
-

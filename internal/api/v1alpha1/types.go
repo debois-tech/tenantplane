@@ -146,7 +146,7 @@ type IsolationControls struct {
 	RuntimeClassName          string `json:"runtimeClassName,omitempty"`
 	BlockHostPathVolumes      bool   `json:"blockHostPathVolumes"`
 	BlockPrivilegedContainers bool   `json:"blockPrivilegedContainers"`
-	APIFairness              string `json:"apiFairness"`
+	APIFairness               string `json:"apiFairness"`
 }
 
 type SyncPolicySpec struct {
@@ -178,4 +178,3 @@ type Condition struct {
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message,omitempty"`
 }
-

@@ -16,11 +16,11 @@ spec:
       direction: toHost
     - apiVersion: v1
       kind: Service
-      direction: bidirectional
+      direction: toHost
     - apiVersion: v1
       kind: ConfigMap
-      direction: bidirectional
+      direction: toHost
     - apiVersion: v1
       kind: Secret
-      direction: bidirectional
+      direction: toHost
 
