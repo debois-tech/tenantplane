@@ -100,6 +100,22 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 		return r.degrade(ctx, tc, "IsolationApplyFailed", err.Error())
 	}
 
+	// Admission-layer backstop for runtimeClassName: defense-in-depth alongside
+	// the sync engine's own injection (see runSync), which is what actually
+	// enforces it — this only hardens against a pod reaching the host some
+	// other way. Absent on clusters without ValidatingAdmissionPolicy v1
+	// (pre-1.30); that gap is reported honestly rather than failing the tenant.
+	admissionSupported, err := r.ensureRuntimeClassPolicy(ctx)
+	if err != nil {
+		return r.degrade(ctx, tc, "AdmissionPolicyFailed", err.Error())
+	}
+	if admissionSupported {
+		if err := r.reconcileRuntimeClassBinding(ctx, tc); err != nil {
+			return r.degrade(ctx, tc, "AdmissionBindingFailed", err.Error())
+		}
+	}
+	setAdmissionHardeningCondition(tc, admissionSupported)
+
 	if err := r.ensureControlPlaneNamespace(ctx, tc); err != nil {
 		return r.degrade(ctx, tc, "ControlPlaneNamespaceFailed", err.Error())
 	}
@@ -149,7 +165,7 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 	// a moment more before it serves. A sync failure here is expected during that
 	// window: record it as a condition and requeue soon rather than degrading the
 	// otherwise-healthy tenant.
-	if err := r.runSync(ctx, tc, syncPolicy, secretName); err != nil {
+	if err := r.runSync(ctx, tc, syncPolicy, profile, secretName); err != nil {
 		setCondition(tc, "Synced", corev1.ConditionFalse, "SyncFailed", err.Error())
 		if updateErr := r.Status().Update(ctx, tc); updateErr != nil {
 			return reconcile.Result{}, updateErr

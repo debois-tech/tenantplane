@@ -15,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"golang.org/x/time/rate"
+
 	"github.com/debois-tech/tenantplane/internal/syncplan"
 )
 
@@ -86,6 +88,22 @@ type Engine struct {
 
 	// SkipNamespaces overrides defaultSkipNamespaces when non-nil.
 	SkipNamespaces map[string]bool
+
+	// RequiredRuntimeClassName, when set, is stamped onto every synced Pod's
+	// spec.runtimeClassName — overwriting whatever the tenant set. Isolation is
+	// not a tenant-negotiable setting: this is how an IsolationProfile's
+	// runtimeClassName (e.g. a sandboxed runtime) reaches every pod without
+	// requiring tenant awareness, and it cannot be bypassed by a tenant simply
+	// omitting or overriding the field. A ValidatingAdmissionPolicy binds the
+	// same requirement at the host API server as a defense-in-depth backstop.
+	RequiredRuntimeClassName string
+
+	// RateLimiter caps how many host writes this tenant's sync passes may make
+	// per second (IsolationProfile.apiFairness). A nil limiter is unlimited.
+	// When the limit is hit, the write is not attempted; it is recorded as an
+	// explainable Skip decision and retried on the next sync pass, rather than
+	// blocking the shared reconcile worker.
+	RateLimiter *rate.Limiter
 }
 
 // SyncToHost performs one convergence pass for res: it projects every eligible
@@ -125,6 +143,12 @@ func (e *Engine) SyncToHost(ctx context.Context, res Resource) ([]Decision, erro
 			continue
 		}
 		host.SetGroupVersionKind(res.GVK)
+		if res.GVK.Kind == "Pod" && e.RequiredRuntimeClassName != "" {
+			if err := unstructured.SetNestedField(host.Object, e.RequiredRuntimeClassName, "spec", "runtimeClassName"); err != nil {
+				errs = append(errs, fmt.Errorf("%s/%s: set runtimeClassName: %w", obj.GetNamespace(), obj.GetName(), err))
+				continue
+			}
+		}
 		desiredHostNames[host.GetName()] = true
 
 		d, err := e.applyHost(ctx, ref, host)
@@ -165,6 +189,9 @@ func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *
 	target := syncplan.HostTarget{Namespace: host.GetNamespace(), Name: host.GetName()}
 
 	if apierrors.IsNotFound(err) {
+		if d, limited := e.rateLimited(ref, target); limited {
+			return d, nil
+		}
 		if err := e.HostClient.Create(ctx, host); err != nil {
 			return Decision{}, err
 		}
@@ -185,6 +212,9 @@ func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *
 			Reason: fmt.Sprintf("host name collides with a different tenant object (%s/%s)", existingRef.VirtualNamespace, existingRef.Name)}, nil
 	}
 
+	if d, limited := e.rateLimited(ref, target); limited {
+		return d, nil
+	}
 	host.SetResourceVersion(existing.GetResourceVersion())
 	syncplan.AdoptHostAllocatedFields(existing, host)
 	if err := e.HostClient.Update(ctx, host); err != nil {
@@ -192,6 +222,18 @@ func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *
 	}
 	return Decision{Action: ActionUpdate, Kind: ref.Kind, Ref: ref, Host: target,
 		Reason: "reconciled host object to match virtual source"}, nil
+}
+
+// rateLimited reports whether this tenant's apiFairness budget is exhausted
+// for right now. When true, the caller must not perform the write; the
+// returned Decision explains the deferral so throttling is visible, not
+// silent, and the object is simply retried on the next sync pass.
+func (e *Engine) rateLimited(ref syncplan.ResourceRef, target syncplan.HostTarget) (Decision, bool) {
+	if e.RateLimiter == nil || e.RateLimiter.Allow() {
+		return Decision{}, false
+	}
+	return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
+		Reason: "apiFairness rate limit reached for this tenant; retrying next sync pass"}, true
 }
 
 // sameSource reports whether an existing host object's reverse-mapped identity
@@ -228,13 +270,17 @@ func (e *Engine) collectOrphans(ctx context.Context, gvk schema.GroupVersionKind
 			continue
 		}
 		ref, _ := syncplan.ReverseLookup(obj)
+		target := syncplan.HostTarget{Namespace: obj.GetNamespace(), Name: obj.GetName()}
+		if d, limited := e.rateLimited(ref, target); limited {
+			decisions = append(decisions, d)
+			continue
+		}
 		if err := e.HostClient.Delete(ctx, obj); err != nil && !apierrors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("delete orphan %s: %w", obj.GetName(), err))
 			continue
 		}
 		decisions = append(decisions, Decision{
-			Action: ActionDelete, Kind: gvk.Kind, Ref: ref,
-			Host:   syncplan.HostTarget{Namespace: obj.GetNamespace(), Name: obj.GetName()},
+			Action: ActionDelete, Kind: gvk.Kind, Ref: ref, Host: target,
 			Reason: "virtual source no longer exists",
 		})
 	}

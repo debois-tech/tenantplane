@@ -101,6 +101,10 @@ func (r *TenantClusterReconciler) ensureControlPlaneNamespace(ctx context.Contex
 // and only then releases the finalizer. Everything in the workload namespace
 // is owner-referenced and garbage-collected by Kubernetes itself.
 func (r *TenantClusterReconciler) teardown(ctx context.Context, tc *v1alpha1.TenantCluster) (bool, error) {
+	if err := r.deleteRuntimeClassBinding(ctx, tc); err != nil {
+		return false, err
+	}
+
 	ns := &corev1.Namespace{}
 	err := r.Get(ctx, types.NamespacedName{Name: controlPlaneNamespace(tc)}, ns)
 	if apierrors.IsNotFound(err) {

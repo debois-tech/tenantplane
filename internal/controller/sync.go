@@ -13,16 +13,43 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"golang.org/x/time/rate"
+
 	"github.com/debois-tech/tenantplane/internal/api/v1alpha1"
+	"github.com/debois-tech/tenantplane/internal/isolation"
 	"github.com/debois-tech/tenantplane/internal/syncer"
 )
+
+// apiFairness rate limits: apiFairness is enforced as a cap on how many host
+// writes this tenant's sync passes may make per second, protecting the shared
+// host API server from one noisy tenant. "tenant-strict" (the sandboxed level)
+// gets a tighter budget than "tenant"; an unset value is unlimited.
+const (
+	fairnessRateTenant        = 20
+	fairnessBurstTenant       = 40
+	fairnessRateTenantStrict  = 5
+	fairnessBurstTenantStrict = 10
+)
+
+// rateLimiterForFairness builds the per-tenant sync rate limiter for an
+// apiFairness setting, or nil (unlimited) when unset or unrecognized.
+func rateLimiterForFairness(apiFairness string) *rate.Limiter {
+	switch apiFairness {
+	case "tenant":
+		return rate.NewLimiter(rate.Limit(fairnessRateTenant), fairnessBurstTenant)
+	case "tenant-strict":
+		return rate.NewLimiter(rate.Limit(fairnessRateTenantStrict), fairnessBurstTenantStrict)
+	default:
+		return nil
+	}
+}
 
 // runSync performs one sync convergence pass for tc using the kubeconfig secret
 // the reconciler already extracted from the control-plane pod. It is best-effort
 // relative to the tenant's readiness: a control plane that is Ready per its
 // StatefulSet may still be seconds away from serving its API, so a failure here
 // is surfaced as a condition but does not fail the whole reconcile.
-func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.TenantCluster, policy *v1alpha1.SyncPolicy, kubeconfigSecret string) error {
+func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.TenantCluster, policy *v1alpha1.SyncPolicy, profile isolation.Profile, kubeconfigSecret string) error {
 	resources := syncResourcesFromPolicy(policy)
 	if len(resources) == 0 {
 		return nil
@@ -34,11 +61,13 @@ func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.Tena
 	}
 
 	engine := &syncer.Engine{
-		Tenant:        tc.Name,
-		HostNamespace: tc.Namespace,
-		VirtualClient: virtualClient,
-		HostClient:    r.Client,
-		Recorder:      &eventDecisionRecorder{recorder: r.Recorder, object: tc},
+		Tenant:                   tc.Name,
+		HostNamespace:            tc.Namespace,
+		VirtualClient:            virtualClient,
+		HostClient:               r.Client,
+		Recorder:                 &eventDecisionRecorder{recorder: r.Recorder, object: tc},
+		RequiredRuntimeClassName: profile.RuntimeClassName,
+		RateLimiter:              rateLimiterForFairness(profile.APIFairness),
 	}
 
 	logger := log.FromContext(ctx)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	"k8s.io/client-go/kubernetes"
@@ -11,6 +12,17 @@ import (
 
 	"github.com/debois-tech/tenantplane/internal/controller"
 )
+
+const version = "0.1.0-dev"
+
+// banner prints a short, human-friendly startup line to stdout — separate from
+// the structured zap logging below, which stays JSON/console-formatted for log
+// aggregation. Each line is only printed once the real step it describes has
+// actually completed, the same way minikube's own startup banner narrates real
+// progress rather than a fixed, cosmetic sequence.
+func banner(format string, args ...interface{}) {
+	fmt.Printf(format+"\n", args...)
+}
 
 func main() {
 	var metricsAddr string
@@ -23,9 +35,13 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	banner("🪐 tenantplane %s", version)
+
 	scheme := runtimeScheme()
+	banner("✅ Registered the tenantplane.io/v1alpha1 API types")
 
 	restConfig := ctrl.GetConfigOrDie()
+	banner("🔌 Connecting to the Kubernetes API server at %s", restConfig.Host)
 
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
@@ -54,6 +70,7 @@ func main() {
 		ctrl.Log.Error(err, "unable to create controller", "controller", "TenantCluster")
 		os.Exit(1)
 	}
+	banner("🚀 TenantCluster controller registered")
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		ctrl.Log.Error(err, "unable to set up health check")
@@ -63,6 +80,9 @@ func main() {
 		ctrl.Log.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+	banner("🏥 Health checks: healthz/readyz on %s", probeAddr)
+	banner("📊 Metrics on %s", metricsAddr)
+	banner("🎉 tenantplane is up — watching for TenantCluster, IsolationProfile, and SyncPolicy objects")
 
 	ctrl.Log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

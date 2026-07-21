@@ -21,6 +21,21 @@ func setSupportConditions(tc *v1alpha1.TenantCluster, profile *v1alpha1.Isolatio
 	setSyncSupportCondition(tc, policy)
 }
 
+// setAdmissionHardeningCondition reports whether the host cluster supports the
+// ValidatingAdmissionPolicy defense-in-depth backstop for runtimeClassName.
+// This is deliberately a separate condition from IsolationEnforced: the
+// declared control is enforced either way (the sync engine injects
+// runtimeClassName on every synced pod), this only reports whether the extra
+// admission-layer safety net is also active on this cluster.
+func setAdmissionHardeningCondition(tc *v1alpha1.TenantCluster, supported bool) {
+	if supported {
+		setCondition(tc, "AdmissionHardening", corev1.ConditionTrue, "ValidatingAdmissionPolicyActive", "")
+		return
+	}
+	setCondition(tc, "AdmissionHardening", corev1.ConditionFalse, "ValidatingAdmissionPolicyUnavailable",
+		"runtimeClassName is still enforced by the sync engine, but the admission-layer backstop is unavailable: this cluster does not serve admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy (requires Kubernetes 1.30+)")
+}
+
 func setModeCondition(tc *v1alpha1.TenantCluster) {
 	if tc.Spec.Mode != v1alpha1.TenantModeShared {
 		setCondition(tc, "ModeSupported", corev1.ConditionFalse, "NotImplemented",
@@ -33,22 +48,17 @@ func setModeCondition(tc *v1alpha1.TenantCluster) {
 // setIsolationCondition reports which declared isolation controls carry real
 // enforcement. blockPrivilegedContainers and blockHostPathVolumes are enforced
 // through the Pod Security Admission enforce label (the "baseline" level blocks
-// both), so they are not flagged; runtimeClassName and apiFairness have no
-// enforcement behind them yet.
+// both); runtimeClassName is enforced by the sync engine stamping it onto every
+// synced pod (see AdmissionHardening for the separate admission-layer
+// backstop); apiFairness is enforced as a per-tenant rate limit on sync writes.
+// There are currently no isolation controls left unenforced, but the function
+// stays generic so a future control can be flagged the same way.
 func setIsolationCondition(tc *v1alpha1.TenantCluster, profile *v1alpha1.IsolationProfile) {
 	if profile == nil {
 		return
 	}
-	controls := profile.Spec.Controls
 
 	var advisory []string
-	if controls.RuntimeClassName != "" {
-		advisory = append(advisory, "runtimeClassName")
-	}
-	if controls.APIFairness != "" {
-		advisory = append(advisory, "apiFairness")
-	}
-
 	if len(advisory) > 0 {
 		setCondition(tc, "IsolationEnforced", corev1.ConditionFalse, "PartiallyEnforced",
 			fmt.Sprintf("declared but not yet enforced through admission: %s", strings.Join(advisory, ", ")))

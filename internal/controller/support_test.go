@@ -71,21 +71,19 @@ func TestSupportConditionsFlagUnsupportedMode(t *testing.T) {
 	}
 }
 
-func TestSupportConditionsFlagUnenforcedIsolationControls(t *testing.T) {
+func TestSupportConditionsDoNotFlagRuntimeClassNameOrAPIFairness(t *testing.T) {
+	// runtimeClassName is enforced by the sync engine stamping it onto every
+	// synced pod, and apiFairness by the engine's per-tenant rate limiter — both
+	// declaring one must not degrade IsolationEnforced.
 	tc := cloudTenant()
 	profile := supportedProfile()
 	profile.Spec.Controls.RuntimeClassName = "gvisor"
-	profile.Spec.Controls.APIFairness = "tenant"
+	profile.Spec.Controls.APIFairness = "tenant-strict"
 	setSupportConditions(tc, profile, supportedPolicy())
 
 	cond := condition(tc, "IsolationEnforced")
-	if cond == nil || cond.Status != string(corev1.ConditionFalse) {
-		t.Fatalf("IsolationEnforced = %+v, want False", cond)
-	}
-	for _, want := range []string{"runtimeClassName", "apiFairness"} {
-		if !strings.Contains(cond.Message, want) {
-			t.Fatalf("message missing %q: %q", want, cond.Message)
-		}
+	if cond == nil || cond.Status != string(corev1.ConditionTrue) {
+		t.Fatalf("IsolationEnforced = %+v, want True", cond)
 	}
 }
 
@@ -133,5 +131,27 @@ func TestSupportConditionsFlagUnimplementedSyncSettings(t *testing.T) {
 		if !strings.Contains(cond.Message, want) {
 			t.Fatalf("message missing %q: %q", want, cond.Message)
 		}
+	}
+}
+
+func TestSetAdmissionHardeningCondition(t *testing.T) {
+	tc := cloudTenant()
+	setAdmissionHardeningCondition(tc, true)
+	cond := condition(tc, "AdmissionHardening")
+	if cond == nil || cond.Status != string(corev1.ConditionTrue) {
+		t.Fatalf("AdmissionHardening = %+v, want True", cond)
+	}
+
+	tc2 := cloudTenant()
+	setAdmissionHardeningCondition(tc2, false)
+	cond2 := condition(tc2, "AdmissionHardening")
+	if cond2 == nil || cond2.Status != string(corev1.ConditionFalse) {
+		t.Fatalf("AdmissionHardening = %+v, want False", cond2)
+	}
+	if !strings.Contains(cond2.Message, "1.30") {
+		t.Fatalf("message should note the version requirement: %q", cond2.Message)
+	}
+	if !strings.Contains(cond2.Message, "sync engine") {
+		t.Fatalf("message should clarify the control is still enforced elsewhere: %q", cond2.Message)
 	}
 }

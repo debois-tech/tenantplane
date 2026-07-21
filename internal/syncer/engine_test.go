@@ -12,6 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"golang.org/x/time/rate"
+
 	"github.com/debois-tech/tenantplane/internal/syncplan"
 )
 
@@ -329,5 +331,77 @@ func TestSyncToHostSkipsVirtualInfrastructure(t *testing.T) {
 		if d.Ref.Name == "kube-root-ca.crt" {
 			t.Fatalf("the root-CA bundle ConfigMap must never be projected onto the host: %+v", d)
 		}
+	}
+}
+
+func TestSyncToHostInjectsRequiredRuntimeClassName(t *testing.T) {
+	scheme := testScheme(t)
+	podGVK := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "web"},
+		Spec: corev1.PodSpec{
+			Containers:       []corev1.Container{{Name: "app", Image: "nginx"}},
+			RuntimeClassName: strPtr("whatever-the-tenant-set"),
+		},
+	}
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	e.RequiredRuntimeClassName = "kata-qemu"
+
+	if _, err := e.SyncToHost(context.Background(), Resource{GVK: podGVK, Direction: DirectionToHost}); err != nil {
+		t.Fatalf("SyncToHost() error = %v", err)
+	}
+
+	hostPod := &corev1.Pod{}
+	if err := host.Get(context.Background(), client.ObjectKey{Namespace: "team-dev", Name: "web-x-default-x-dev"}, hostPod); err != nil {
+		t.Fatalf("get host pod: %v", err)
+	}
+	if hostPod.Spec.RuntimeClassName == nil || *hostPod.Spec.RuntimeClassName != "kata-qemu" {
+		t.Fatalf("runtimeClassName = %v, want kata-qemu (isolation must override whatever the tenant set)", hostPod.Spec.RuntimeClassName)
+	}
+}
+
+func strPtr(s string) *string { return &s }
+
+func TestSyncToHostRateLimitsAndRecordsSkip(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "one", map[string]string{}),
+		virtualConfigMap("default", "two", map[string]string{}),
+		virtualConfigMap("default", "three", map[string]string{}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, rec := newEngine(t, virtual, host)
+	// Burst of 1: the first write proceeds, the rest of this pass must be
+	// deferred as explainable Skips rather than silently dropped or blocked.
+	e.RateLimiter = rate.NewLimiter(rate.Limit(0), 1)
+
+	decisions, err := e.SyncToHost(context.Background(), Resource{GVK: configMapGVK, Direction: DirectionToHost})
+	if err != nil {
+		t.Fatalf("SyncToHost() error = %v", err)
+	}
+	if len(decisions) != 3 {
+		t.Fatalf("expected 3 decisions (1 create + 2 rate-limited skips), got %d: %+v", len(decisions), decisions)
+	}
+	var creates, skips int
+	for _, d := range decisions {
+		switch d.Action {
+		case ActionCreate:
+			creates++
+		case ActionSkip:
+			skips++
+			if d.Reason == "" {
+				t.Fatal("a rate-limited skip must explain itself")
+			}
+		}
+	}
+	if creates != 1 || skips != 2 {
+		t.Fatalf("expected 1 create and 2 skips, got %d creates and %d skips", creates, skips)
+	}
+	if len(rec.decisions) != len(decisions) {
+		t.Fatalf("recorder saw %d decisions, engine returned %d", len(rec.decisions), len(decisions))
 	}
 }
