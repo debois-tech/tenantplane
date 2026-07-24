@@ -114,12 +114,13 @@ func TestSupportConditionsDoNotFlagPSAEnforcedControls(t *testing.T) {
 }
 
 func TestSupportConditionsDoNotFlagImplementedSyncSettings(t *testing.T) {
-	// toHost, fromHost, bidirectional, all three conflictPolicy values, and
-	// explain.recordDecisions/retain are all implemented now; only
-	// driftDetection.interval remains unhonored (see the other test below).
+	// toHost, fromHost, bidirectional, all three conflictPolicy values,
+	// explain.recordDecisions/retain, and driftDetection.interval are all
+	// implemented now — nothing left for a well-formed SyncPolicy to flag.
 	tc := cloudTenant()
 	policy := supportedPolicy()
 	policy.Spec.ConflictPolicy = "host-wins"
+	policy.Spec.DriftDetection = v1alpha1.DriftDetectionSpec{Enabled: true, Interval: "30s"}
 	policy.Spec.Explain = v1alpha1.ExplainSpec{RecordDecisions: true, Retain: 1000}
 	policy.Spec.Resources = append(policy.Spec.Resources,
 		v1alpha1.SyncedResource{APIVersion: "v1", Kind: "Service", Direction: "bidirectional"},
@@ -132,18 +133,23 @@ func TestSupportConditionsDoNotFlagImplementedSyncSettings(t *testing.T) {
 	}
 }
 
-func TestSupportConditionsFlagUnimplementedSyncSettings(t *testing.T) {
+func TestSupportConditionsFlagUnrecognizedDirection(t *testing.T) {
+	// The CRD's enum already rejects anything but toHost/fromHost/bidirectional
+	// at admission; this exercises the defensive fallback directly on the Go
+	// struct for an object that predates that validation (or one written by a
+	// future version declaring a direction this build doesn't know about).
 	tc := cloudTenant()
 	policy := supportedPolicy()
-	policy.Spec.DriftDetection = v1alpha1.DriftDetectionSpec{Enabled: true, Interval: "30s"}
+	policy.Spec.Resources = append(policy.Spec.Resources,
+		v1alpha1.SyncedResource{APIVersion: "v1", Kind: "Service", Direction: "sideways"})
 	setSupportConditions(tc, supportedProfile(), policy)
 
 	cond := condition(tc, "SyncSupported")
 	if cond == nil || cond.Status != string(corev1.ConditionFalse) {
 		t.Fatalf("SyncSupported = %+v, want False", cond)
 	}
-	if !strings.Contains(cond.Message, "driftDetection.interval") {
-		t.Fatalf("message missing %q: %q", "driftDetection.interval", cond.Message)
+	if !strings.Contains(cond.Message, "Service (sideways)") {
+		t.Fatalf("message missing the unrecognized resource: %q", cond.Message)
 	}
 }
 

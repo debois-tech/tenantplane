@@ -187,7 +187,28 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 		return reconcile.Result{}, err
 	}
 
-	return reconcile.Result{RequeueAfter: requeueSteady}, nil
+	return reconcile.Result{RequeueAfter: syncRequeueInterval(syncPolicy)}, nil
+}
+
+// syncRequeueInterval returns how soon the next steady-state reconcile (and
+// thus the next sync pass) should run. A SyncPolicy that enables
+// driftDetection with a valid interval overrides the default cadence;
+// anything else — disabled, unset, or an unparseable value the CRD's regex
+// happened not to catch — falls back to requeueSteady. A value below
+// requeueWaiting is floored there: driftDetection.interval requests how often
+// to check, not permission to hot-loop the reconciler.
+func syncRequeueInterval(policy *v1alpha1.SyncPolicy) time.Duration {
+	if policy == nil || !policy.Spec.DriftDetection.Enabled || policy.Spec.DriftDetection.Interval == "" {
+		return requeueSteady
+	}
+	d, err := time.ParseDuration(policy.Spec.DriftDetection.Interval)
+	if err != nil {
+		return requeueSteady
+	}
+	if d < requeueWaiting {
+		return requeueWaiting
+	}
+	return d
 }
 
 func (r *TenantClusterReconciler) degrade(ctx context.Context, tc *v1alpha1.TenantCluster, reason, message string) (reconcile.Result, error) {

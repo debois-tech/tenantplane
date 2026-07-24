@@ -84,9 +84,9 @@ func setIsolationCondition(tc *v1alpha1.TenantCluster, profile *v1alpha1.Isolati
 
 // setSyncSupportCondition reports which parts of the referenced SyncPolicy the
 // engine actually honors today. All three directions (toHost, fromHost,
-// bidirectional), all three conflictPolicy values, and explain.recordDecisions
-// / explain.retain (see recordSyncDecisions) are implemented; what remains
-// unimplemented is driftDetection.interval (see below), plus any declared
+// bidirectional), all three conflictPolicy values, explain.recordDecisions /
+// explain.retain (see recordSyncDecisions), and driftDetection.interval (see
+// syncRequeueInterval) are all implemented. What's left is only a declared
 // direction/kind combination the CRD's enum would already reject before this
 // ever runs (kept here only as a defensive, unreachable-in-practice check).
 func setSyncSupportCondition(tc *v1alpha1.TenantCluster, policy *v1alpha1.SyncPolicy) {
@@ -106,9 +106,6 @@ func setSyncSupportCondition(tc *v1alpha1.TenantCluster, policy *v1alpha1.SyncPo
 	var notes []string
 	if len(skipped) > 0 {
 		notes = append(notes, fmt.Sprintf(`unrecognized sync direction; these declared resources are not synced: %s`, strings.Join(skipped, ", ")))
-	}
-	if policy.Spec.DriftDetection.Enabled && policy.Spec.DriftDetection.Interval != "" {
-		notes = append(notes, "driftDetection.interval is not yet honored; sync runs on the controller's fixed resync cadence")
 	}
 
 	if len(notes) > 0 {
