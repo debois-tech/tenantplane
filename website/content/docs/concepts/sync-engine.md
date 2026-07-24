@@ -84,9 +84,27 @@ Pulling host content into the tenant only ever replaces the object's *content*
 resourceVersion are left alone, since the tenant object is something the tenant
 still manages, not something tenantplane owns outright the way a host mirror is.
 
-There is no persisted history of prior syncs, so a real, already-resolved
-conflict looks the same to the engine as one side having drifted alone: it only
-ever compares *current* state on both sides.
+### Convergence history
+
+When `explain.recordDecisions` is set, a `SyncDecision` object also tracks —
+per host object, in `status.lastConverged` — the tenant and host
+resourceVersions the last time a `bidirectional` pair was confirmed to agree.
+resourceVersion is an opaque, monotonically-changing "has anyone written this
+since I last looked" marker, which is exactly what's needed here without
+hashing content.
+
+This is what lets `conflictPolicy: manual` tell a one-sided drift from a
+genuine conflict: if only one side's resourceVersion has moved since the
+recorded baseline, that side's change propagates automatically — it isn't
+really a conflict, just an ordinary update the other side hasn't caught up to
+yet. Only when both sides have moved (or no baseline is recorded yet) does
+`manual` actually leave both sides untouched. `tenant-wins`/`host-wins` are
+unaffected by this — they're already fully decisive, so they enforce their
+declared winner on any disagreement regardless of history.
+
+Without `explain.recordDecisions` there's no `SyncDecision` object to persist
+this in, so `bidirectional` falls back to comparing only current tenant vs.
+current host state on every pass, exactly as if this history didn't exist.
 
 ### Name collisions
 

@@ -22,7 +22,9 @@ not a commitment to dates or ordering.
 - Tenant kubeconfig extraction into a host Secret.
 - Full sync engine: `toHost`, `fromHost`, and `bidirectional` directions, all
   with orphan garbage collection; `bidirectional` honors `conflictPolicy`
-  (`manual`, `tenant-wins`, `host-wins`).
+  (`manual`, `tenant-wins`, `host-wins`), and — when `explain.recordDecisions`
+  is set — tells a one-sided drift from a genuine two-sided conflict using a
+  persisted convergence history, instead of only comparing current state.
 - Sync decisions recorded as Kubernetes Events and, when
   `explain.recordDecisions` is set, in a durable, queryable `SyncDecision`
   object per tenant (capped by `explain.retain`).
@@ -38,10 +40,6 @@ not a commitment to dates or ordering.
 
 ## Next
 
-- **Persisted decision history** — `SyncDecision` records every action taken,
-  but conflict detection still only compares current tenant vs. current host
-  state; a retained history would let it tell "only one side changed" from a
-  genuine two-sided conflict.
 - **Multi-replica / HA control planes** and non-SQLite datastores.
 
 ## Later

@@ -72,8 +72,14 @@ owned by it. Only created when the owning SyncPolicy sets
 | `status.entries[].tenantNamespace` / `tenantName` | string | The tenant-side object. |
 | `status.entries[].hostNamespace` / `hostName` | string | The host-side object. |
 | `status.entries[].reason` | string | Human-readable explanation. |
+| `status.lastConverged[hostName].tenantResourceVersion` | string | Tenant object's resourceVersion the last time this `bidirectional` pair agreed. |
+| `status.lastConverged[hostName].hostResourceVersion` | string | Host object's resourceVersion at that same point. |
 
-Bounded to at most `explain.retain` entries, oldest evicted first.
+`status.entries` is bounded to at most `explain.retain` entries, oldest
+evicted first. `status.lastConverged` has no such cap — it only grows with the
+number of distinct `bidirectional` objects, not with time — and backs
+`conflictPolicy: manual`'s one-sided-drift-vs-genuine-conflict detection (see
+[sync engine](/docs/concepts/sync-engine/#convergence-history)).
 
 ## Reverse-mapping metadata
 

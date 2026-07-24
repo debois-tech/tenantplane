@@ -57,10 +57,17 @@ the same to the engine as one side having drifted alone.
 
 `conflictPolicy` selects how a `bidirectional` disagreement resolves:
 
-- `manual` (the safe default) — the engine records the conflict as a `Skip`
-  decision and changes neither side.
-- `tenant-wins` — the tenant's current state is pushed to the host, like `toHost`.
-- `host-wins` — the host's current state is pulled into the tenant, like `fromHost`.
+- `manual` (the safe default) — when `explain.recordDecisions` is set, a
+  one-sided drift (only the tenant or only the host changed since they last
+  agreed) auto-resolves in the direction of that change; only a genuine
+  two-sided change — or no recorded history yet — is left alone as a `Skip`
+  decision. Without `explain.recordDecisions` there's nowhere to persist that
+  history, so every disagreement is treated as needing a human, exactly as if
+  this distinction didn't exist.
+- `tenant-wins` — the tenant's current state is always pushed to the host,
+  like `toHost`, on any disagreement — a one-sided drift doesn't change this.
+- `host-wins` — the host's current state is always pulled into the tenant,
+  like `fromHost`, on any disagreement — same here.
 
 ## Explainability
 
