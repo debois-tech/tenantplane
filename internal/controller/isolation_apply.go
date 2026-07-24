@@ -76,6 +76,12 @@ func (r *TenantClusterReconciler) applyIsolation(ctx context.Context, tc *v1alph
 // applyNamespacePodSecurityLabels merges Pod Security Admission labels onto the
 // namespace. Namespaces are cluster-scoped so they cannot carry an owner reference
 // to a namespaced TenantCluster; labels are simply reconciled idempotently each pass.
+//
+// It also stamps labelManagedBy, even though tenantplane did not create this
+// namespace (the tenant did): the controller-write-scope admission policy (see
+// rbac_scope.go) uses this label to recognize every namespace it is allowed to
+// write into, and this is one of them (kubeconfig Secret, NetworkPolicy,
+// ResourceQuota, LimitRange, and synced tenant objects all live here).
 func (r *TenantClusterReconciler) applyNamespacePodSecurityLabels(ctx context.Context, namespace string, profile isolation.Profile) error {
 	ns := &corev1.Namespace{}
 	if err := r.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
@@ -88,8 +94,12 @@ func (r *TenantClusterReconciler) applyNamespacePodSecurityLabels(ctx context.Co
 	if ns.Labels == nil {
 		ns.Labels = map[string]string{}
 	}
-	changed := false
+	desired := map[string]string{labelManagedBy: "tenantplane"}
 	for k, v := range isolation.PodSecurityLabels(profile) {
+		desired[k] = v
+	}
+	changed := false
+	for k, v := range desired {
 		if ns.Labels[k] != v {
 			ns.Labels[k] = v
 			changed = true

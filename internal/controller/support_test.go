@@ -155,3 +155,25 @@ func TestSetAdmissionHardeningCondition(t *testing.T) {
 		t.Fatalf("message should clarify the control is still enforced elsewhere: %q", cond2.Message)
 	}
 }
+
+func TestSetControllerScopeCondition(t *testing.T) {
+	tc := cloudTenant()
+	setControllerScopeCondition(tc, true)
+	cond := condition(tc, "ControllerRBACScoped")
+	if cond == nil || cond.Status != string(corev1.ConditionTrue) {
+		t.Fatalf("ControllerRBACScoped = %+v, want True", cond)
+	}
+
+	tc2 := cloudTenant()
+	setControllerScopeCondition(tc2, false)
+	cond2 := condition(tc2, "ControllerRBACScoped")
+	if cond2 == nil || cond2.Status != string(corev1.ConditionFalse) {
+		t.Fatalf("ControllerRBACScoped = %+v, want False", cond2)
+	}
+	if !strings.Contains(cond2.Message, "1.30") {
+		t.Fatalf("message should note the version requirement: %q", cond2.Message)
+	}
+	if !strings.Contains(cond2.Message, "ClusterRole") {
+		t.Fatalf("message should clarify RBAC itself is unaffected: %q", cond2.Message)
+	}
+}

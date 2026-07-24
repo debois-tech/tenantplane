@@ -116,6 +116,16 @@ func (r *TenantClusterReconciler) Reconcile(ctx context.Context, req reconcile.R
 	}
 	setAdmissionHardeningCondition(tc, admissionSupported)
 
+	// Admission-layer backstop narrowing the controller's own (unavoidably
+	// cluster-wide) RBAC grant to only the namespaces it manages. Global and
+	// not tenant-specific, but ensured here — cheaply idempotent — since
+	// every reconcile already has a live client at hand.
+	scopeSupported, err := r.ensureControllerScopePolicies(ctx)
+	if err != nil {
+		return r.degrade(ctx, tc, "ControllerScopePolicyFailed", err.Error())
+	}
+	setControllerScopeCondition(tc, scopeSupported)
+
 	if err := r.ensureControlPlaneNamespace(ctx, tc); err != nil {
 		return r.degrade(ctx, tc, "ControlPlaneNamespaceFailed", err.Error())
 	}
@@ -306,6 +316,13 @@ func (r *TenantClusterReconciler) reconcileStatefulSet(ctx context.Context, tc *
 // the control-plane namespace; if an existing Secret points at a stale server
 // address (e.g. from before control planes moved to their own namespace), it
 // is regenerated in place.
+//
+// This Secret holds a real k3s admin kubeconfig — full cluster-admin of the
+// tenant's own virtual cluster, which is the intended access level (a tenant
+// is meant to administer its own control plane). It carries no expiry and is
+// never rotated. Access control is entirely delegated to whatever RBAC the
+// host cluster operator has configured for reading Secrets in this namespace;
+// tenantplane does not add a second authorization layer on top of that.
 func (r *TenantClusterReconciler) ensureKubeconfigSecret(ctx context.Context, tc *v1alpha1.TenantCluster, name string) (*corev1.Secret, error) {
 	fqdn := controlPlaneServiceFQDN(tc)
 

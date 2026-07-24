@@ -36,6 +36,21 @@ func setAdmissionHardeningCondition(tc *v1alpha1.TenantCluster, supported bool) 
 		"runtimeClassName is still enforced by the sync engine, but the admission-layer backstop is unavailable: this cluster does not serve admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy (requires Kubernetes 1.30+)")
 }
 
+// setControllerScopeCondition reports whether the admission-layer backstop
+// that confines the controller's own writes and namespace deletions to
+// namespaces it manages (see rbac_scope.go) is active on this cluster. Like
+// AdmissionHardening, this is defense-in-depth only: the controller's RBAC
+// grant is unaffected either way, this just reports whether the extra
+// admission-layer narrowing is also active.
+func setControllerScopeCondition(tc *v1alpha1.TenantCluster, supported bool) {
+	if supported {
+		setCondition(tc, "ControllerRBACScoped", corev1.ConditionTrue, "ValidatingAdmissionPolicyActive", "")
+		return
+	}
+	setCondition(tc, "ControllerRBACScoped", corev1.ConditionFalse, "ValidatingAdmissionPolicyUnavailable",
+		"the controller's ClusterRole is unavoidably cluster-wide, but the admission-layer policy narrowing it to namespaces it manages is unavailable: this cluster does not serve admissionregistration.k8s.io/v1 ValidatingAdmissionPolicy (requires Kubernetes 1.30+)")
+}
+
 func setModeCondition(tc *v1alpha1.TenantCluster) {
 	if tc.Spec.Mode != v1alpha1.TenantModeShared {
 		setCondition(tc, "ModeSupported", corev1.ConditionFalse, "NotImplemented",

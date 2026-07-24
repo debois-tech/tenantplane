@@ -18,11 +18,23 @@ rules:
     resources: ["tenantclusters", "tenantclusters/status", "isolationprofiles", "syncpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["namespaces", "serviceaccounts", "services", "configmaps", "secrets", "pods", "resourcequotas", "limitranges", "events", "persistentvolumeclaims"]
+    resources: ["namespaces", "services", "pods", "resourcequotas", "limitranges", "persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # secrets are never explicitly deleted by the controller: the kubeconfig
+  # Secret carries an owner reference to its TenantCluster and is removed by
+  # garbage collection, and synced tenant Secrets are removed by the syncer's
+  # normal reconciliation. configmaps follow the same pattern.
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: [""]
     resources: ["pods/exec"]
     verbs: ["create"]
+  # Event recording is write-only broadcasting; the recorder never reads or
+  # deletes Events.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
