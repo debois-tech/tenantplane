@@ -38,6 +38,9 @@ spec:
                       message: 'only "shared" is implemented today; "dedicated" and "private" are on the roadmap and are rejected rather than silently reconciled as shared'
                 kubernetesVersion:
                   type: string
+                  x-kubernetes-validations:
+                    - rule: "self.matches('^v1\\\\.(28|29|30|31|32|33)(\\\\.[0-9]+)?$')"
+                      message: 'only v1.28-v1.33 have a known k3s image (patch version is optional and ignored); other versions are rejected rather than silently falling back to a default image'
                 isolationProfileRef:
                   type: object
                   required: ["name"]

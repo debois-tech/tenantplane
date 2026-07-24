@@ -132,3 +132,54 @@ func TestBuildExternalService(t *testing.T) {
 		t.Fatalf("port = %d, want %d", svc.Spec.Ports[0].Port, apiPort)
 	}
 }
+
+func TestK3sImageForVersion(t *testing.T) {
+	cases := []struct {
+		version   string
+		wantImage string
+		wantOK    bool
+	}{
+		{"v1.30", "rancher/k3s:v1.30.6-k3s1", true},
+		{"v1.30.0", "rancher/k3s:v1.30.6-k3s1", true},
+		{"v1.30.4", "rancher/k3s:v1.30.6-k3s1", true},
+		{"v1.28.13", "rancher/k3s:v1.28.13-k3s1", true},
+		{"v1.33", "rancher/k3s:v1.33.1-k3s1", true},
+		{"v1.35.0", "", false},
+		{"v1.27.9", "", false},
+		{"1.30", "", false}, // missing the leading "v" the CRD requires
+		{"", "", false},
+		{"garbage", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.version, func(t *testing.T) {
+			image, ok := k3sImageForVersion(c.version)
+			if ok != c.wantOK || image != c.wantImage {
+				t.Fatalf("k3sImageForVersion(%q) = (%q, %v), want (%q, %v)", c.version, image, ok, c.wantImage, c.wantOK)
+			}
+		})
+	}
+}
+
+func TestBuildStatefulSetUsesResolvedImage(t *testing.T) {
+	tc := cloudTenant()
+	tc.Spec.KubernetesVersion = "v1.31.0"
+	sts, err := buildStatefulSet(tc)
+	if err != nil {
+		t.Fatalf("buildStatefulSet() error = %v", err)
+	}
+	if got := sts.Spec.Template.Spec.Containers[0].Image; got != "rancher/k3s:v1.31.5-k3s1" {
+		t.Fatalf("image = %q, want the image resolved from kubernetesVersion", got)
+	}
+}
+
+func TestBuildStatefulSetFallsBackToDefaultImageForUnsupportedVersion(t *testing.T) {
+	tc := cloudTenant()
+	tc.Spec.KubernetesVersion = "v1.99.0"
+	sts, err := buildStatefulSet(tc)
+	if err != nil {
+		t.Fatalf("buildStatefulSet() error = %v", err)
+	}
+	if got := sts.Spec.Template.Spec.Containers[0].Image; got != defaultK3sImage {
+		t.Fatalf("image = %q, want the default fallback (%s)", got, defaultK3sImage)
+	}
+}

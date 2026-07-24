@@ -19,6 +19,21 @@ func setSupportConditions(tc *v1alpha1.TenantCluster, profile *v1alpha1.Isolatio
 	setModeCondition(tc)
 	setIsolationCondition(tc, profile)
 	setSyncSupportCondition(tc, policy)
+	setKubernetesVersionCondition(tc)
+}
+
+// setKubernetesVersionCondition reports whether spec.kubernetesVersion
+// resolved to an actual k3s image (see k3sImageForVersion in controlplane.go)
+// or fell back to defaultK3sImage. The CRD's own CEL validation already
+// restricts new objects to a supported minor version, so this mainly matters
+// for an object stored before that validation existed.
+func setKubernetesVersionCondition(tc *v1alpha1.TenantCluster) {
+	if _, ok := k3sImageForVersion(tc.Spec.KubernetesVersion); ok {
+		setCondition(tc, "KubernetesVersionSupported", corev1.ConditionTrue, "ImageResolved", "")
+		return
+	}
+	setCondition(tc, "KubernetesVersionSupported", corev1.ConditionFalse, "UnsupportedVersion",
+		fmt.Sprintf("kubernetesVersion %q has no known k3s image; using the default (%s) instead", tc.Spec.KubernetesVersion, defaultK3sImage))
 }
 
 // setAdmissionHardeningCondition reports whether the host cluster supports the

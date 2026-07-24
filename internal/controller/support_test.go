@@ -175,6 +175,30 @@ func TestSetAdmissionHardeningCondition(t *testing.T) {
 	}
 }
 
+func TestSetKubernetesVersionCondition(t *testing.T) {
+	tc := cloudTenant()
+	tc.Spec.KubernetesVersion = "v1.30.4"
+	setKubernetesVersionCondition(tc)
+	cond := condition(tc, "KubernetesVersionSupported")
+	if cond == nil || cond.Status != string(corev1.ConditionTrue) {
+		t.Fatalf("KubernetesVersionSupported = %+v, want True", cond)
+	}
+
+	tc2 := cloudTenant()
+	tc2.Spec.KubernetesVersion = "v1.99.0"
+	setKubernetesVersionCondition(tc2)
+	cond2 := condition(tc2, "KubernetesVersionSupported")
+	if cond2 == nil || cond2.Status != string(corev1.ConditionFalse) {
+		t.Fatalf("KubernetesVersionSupported = %+v, want False", cond2)
+	}
+	if !strings.Contains(cond2.Message, "v1.99.0") {
+		t.Fatalf("message should name the unsupported version: %q", cond2.Message)
+	}
+	if !strings.Contains(cond2.Message, defaultK3sImage) {
+		t.Fatalf("message should name the fallback image: %q", cond2.Message)
+	}
+}
+
 func TestSetControllerScopeCondition(t *testing.T) {
 	tc := cloudTenant()
 	setControllerScopeCondition(tc, true)

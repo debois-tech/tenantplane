@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"regexp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -13,12 +14,47 @@ import (
 	"github.com/debois-tech/tenantplane/internal/isolation"
 )
 
-// defaultK3sImage is pinned to a known-good k3s release. TenantCluster.spec.kubernetesVersion
-// is accepted by the API but not yet wired to image selection: sample manifests reference
-// versions (e.g. v1.35.0) that have no corresponding k3s release yet, and blindly templating
-// the image tag from that field would just produce ImagePullBackOff. This is a known follow-up,
-// not a silent shortcut.
+// defaultK3sImage is used when spec.kubernetesVersion doesn't resolve to a
+// known minor version (see k3sImageForVersion) — a known-good fallback, not a
+// silent substitute: KubernetesVersionSupported (support.go) reports honestly
+// whenever this happens.
 const defaultK3sImage = "rancher/k3s:v1.30.4-k3s1"
+
+// k3sImageVersionPattern extracts the requested major.minor, accepting an
+// optional patch component tenantplane doesn't need to pin itself (e.g.
+// "v1.30", "v1.30.0", and "v1.30.4" all resolve to the same image below). The
+// CRD's own CEL validation already restricts kubernetesVersion to this same
+// pattern at admission; this regexp is what actually resolves it to an image.
+var k3sImageVersionPattern = regexp.MustCompile(`^(v1\.(?:28|29|30|31|32|33))(?:\.[0-9]+)?$`)
+
+// k3sImages maps a requested Kubernetes minor version to a specific,
+// verified-available k3s image tag. Only the minor version is selectable —
+// like GKE/EKS/AKS's own "version selection," patch management is
+// tenantplane's job, not the tenant's. Every tag here was confirmed to exist
+// via `docker manifest inspect` before being added; this is a real,
+// maintained allowlist, not a guess at a naming convention.
+var k3sImages = map[string]string{
+	"v1.28": "rancher/k3s:v1.28.13-k3s1",
+	"v1.29": "rancher/k3s:v1.29.9-k3s1",
+	"v1.30": "rancher/k3s:v1.30.6-k3s1",
+	"v1.31": "rancher/k3s:v1.31.5-k3s1",
+	"v1.32": "rancher/k3s:v1.32.3-k3s1",
+	"v1.33": "rancher/k3s:v1.33.1-k3s1",
+}
+
+// k3sImageForVersion resolves spec.kubernetesVersion to a k3s image. ok is
+// false when the version doesn't match any supported minor — the caller
+// should fall back to defaultK3sImage and report it (see
+// setKubernetesVersionCondition), not silently use it as if it were what was
+// requested.
+func k3sImageForVersion(version string) (image string, ok bool) {
+	m := k3sImageVersionPattern.FindStringSubmatch(version)
+	if m == nil {
+		return "", false
+	}
+	image, ok = k3sImages[m[1]]
+	return image, ok
+}
 
 const apiPort = 6443
 
@@ -87,6 +123,11 @@ func buildStatefulSet(tc *v1alpha1.TenantCluster) (*appsv1.StatefulSet, error) {
 	replicas := int32(tc.Spec.ControlPlane.Replicas)
 	if replicas < 1 {
 		replicas = 1
+	}
+
+	image, ok := k3sImageForVersion(tc.Spec.KubernetesVersion)
+	if !ok {
+		image = defaultK3sImage
 	}
 
 	storageSize := resource.MustParse("1Gi")
@@ -160,7 +201,7 @@ func buildStatefulSet(tc *v1alpha1.TenantCluster) (*appsv1.StatefulSet, error) {
 					Containers: []corev1.Container{
 						{
 							Name:    "k3s",
-							Image:   defaultK3sImage,
+							Image:   image,
 							Command: []string{"k3s"},
 							Args:    args,
 							Ports: []corev1.ContainerPort{

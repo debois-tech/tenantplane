@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/debois-tech/tenantplane/internal/isolation"
@@ -13,6 +14,12 @@ import (
 )
 
 const version = "0.1.0-dev"
+
+// kubernetesVersionPattern mirrors the CRD's own CEL validation (see
+// config/crd/tenantclusters.tenantplane.io.yaml) so this offline CLI can
+// reject the same unsupported versions the API server would, instead of
+// producing a manifest that's guaranteed to fail admission.
+var kubernetesVersionPattern = regexp.MustCompile(`^v1\.(28|29|30|31|32|33)(\.[0-9]+)?$`)
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
@@ -67,7 +74,7 @@ func renderTenantCluster(args []string, stdout io.Writer) error {
 	mode := fs.String("mode", "shared", `tenant mode (only "shared" is implemented; "dedicated" and "private" are on the roadmap)`)
 	isolationProfile := fs.String("isolation-profile", "restricted", "IsolationProfile name")
 	syncPolicy := fs.String("sync-policy", "default", "SyncPolicy name")
-	kubernetesVersion := fs.String("kubernetes-version", "v1.35.0", "tenant Kubernetes version")
+	kubernetesVersion := fs.String("kubernetes-version", "v1.33", "tenant Kubernetes version (v1.28-v1.33 have a known k3s image)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -85,6 +92,9 @@ func renderTenantCluster(args []string, stdout io.Writer) error {
 		return fmt.Errorf("mode %q is not implemented yet (the API server would reject it); only \"shared\" is supported today", *mode)
 	default:
 		return fmt.Errorf("mode must be one of: shared (dedicated and private are on the roadmap)")
+	}
+	if !kubernetesVersionPattern.MatchString(*kubernetesVersion) {
+		return fmt.Errorf("kubernetesVersion %q is not implemented yet (the API server would reject it); only v1.28-v1.33 have a known k3s image", *kubernetesVersion)
 	}
 
 	fmt.Fprintf(stdout, `apiVersion: tenantplane.io/v1alpha1
