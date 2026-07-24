@@ -26,6 +26,8 @@ not a commitment to dates or ordering.
 - Sync decisions recorded as Kubernetes Events and, when
   `explain.recordDecisions` is set, in a durable, queryable `SyncDecision`
   object per tenant (capped by `explain.retain`).
+- `driftDetection.interval` sets the sync/reconcile cadence — every
+  SyncPolicy setting is now honored end to end.
 - Controller RBAC narrowed to the namespaces it actually manages, with the
   same ValidatingAdmissionPolicy backstop pattern hardening it further.
 - CLI: resource rendering and offline `explain-sync`.
@@ -34,12 +36,12 @@ not a commitment to dates or ordering.
 
 ## Next
 
-- **Honor `driftDetection.interval`** — sync currently runs on the
-  controller's fixed resync cadence regardless of what a SyncPolicy declares.
-  A persisted decision history (now that `SyncDecision` exists) would also let
-  conflict detection compare against the last synced state instead of only
-  current tenant vs. current host state.
-- **Kubernetes version selection** — map `kubernetesVersion` to a k3s image.
+- **Kubernetes version selection** — map `kubernetesVersion` to a k3s image;
+  currently accepted but not image-selecting.
+- **Persisted decision history** — `SyncDecision` records every action taken,
+  but conflict detection still only compares current tenant vs. current host
+  state; a retained history would let it tell "only one side changed" from a
+  genuine two-sided conflict.
 - **Multi-replica / HA control planes** and non-SQLite datastores.
 
 ## Later
