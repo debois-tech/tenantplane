@@ -51,3 +51,14 @@ spec:
                         type: string
                       reason:
                         type: string
+                lastConverged:
+                  type: object
+                  description: Per host-object-name tenant/host resourceVersions the last time a bidirectional pair was confirmed to agree.
+                  additionalProperties:
+                    type: object
+                    required: ["tenantResourceVersion", "hostResourceVersion"]
+                    properties:
+                      tenantResourceVersion:
+                        type: string
+                      hostResourceVersion:
+                        type: string

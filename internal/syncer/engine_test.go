@@ -289,10 +289,51 @@ func TestSyncFromHostSkipsWhenAlreadyEqual(t *testing.T) {
 	}
 }
 
-func TestSyncBidirectionalManualRecordsConflictWithoutChangingEitherSide(t *testing.T) {
+// A one-sided drift (only the host changed since the last time tenant and
+// host agreed) is not ambiguous — "manual" auto-resolves it instead of
+// bothering a human with a "conflict" that isn't really one.
+func TestSyncBidirectionalManualAutoResolvesOneSidedDrift(t *testing.T) {
 	scheme := testScheme(t)
 	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
 		virtualConfigMap("default", "shared", map[string]string{"key": "tenant-value"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionBidirectional}
+	if _, err := e.SyncBidirectional(context.Background(), res, "manual"); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	// Only the host changes; the tenant's copy is untouched since bootstrap.
+	hostCM := getHostConfigMap(t, host, "shared-x-default-x-dev")
+	hostCM.Data["key"] = "host-value"
+	if err := host.Update(context.Background(), hostCM); err != nil {
+		t.Fatalf("update host: %v", err)
+	}
+
+	decisions, err := e.SyncBidirectional(context.Background(), res, "manual")
+	if err != nil {
+		t.Fatalf("SyncBidirectional: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionUpdate {
+		t.Fatalf("expected the one-sided host change to auto-resolve, got %+v", decisions)
+	}
+	tenantCM := &corev1.ConfigMap{}
+	if err := virtual.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "shared"}, tenantCM); err != nil {
+		t.Fatalf("get virtual: %v", err)
+	}
+	if tenantCM.Data["key"] != "host-value" {
+		t.Fatalf("tenant = %v, want the host's one-sided change pulled in even under conflictPolicy manual", tenantCM.Data)
+	}
+}
+
+// When BOTH sides have changed since the last time they agreed, that's a
+// genuine conflict — "manual" must leave both untouched and just record it.
+func TestSyncBidirectionalManualRecordsGenuineConflictWithoutChangingEitherSide(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "original"}),
 	).Build()
 	host := fake.NewClientBuilder().WithScheme(scheme).Build()
 
@@ -307,13 +348,21 @@ func TestSyncBidirectionalManualRecordsConflictWithoutChangingEitherSide(t *test
 	if err := host.Update(context.Background(), hostCM); err != nil {
 		t.Fatalf("update host: %v", err)
 	}
+	tenantCM := &corev1.ConfigMap{}
+	if err := virtual.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "shared"}, tenantCM); err != nil {
+		t.Fatalf("get virtual: %v", err)
+	}
+	tenantCM.Data["key"] = "tenant-value"
+	if err := virtual.Update(context.Background(), tenantCM); err != nil {
+		t.Fatalf("update virtual: %v", err)
+	}
 
 	decisions, err := e.SyncBidirectional(context.Background(), res, "manual")
 	if err != nil {
 		t.Fatalf("SyncBidirectional: %v", err)
 	}
 	if len(decisions) != 1 || decisions[0].Action != ActionSkip {
-		t.Fatalf("expected 1 skip (conflict recorded, not resolved), got %+v", decisions)
+		t.Fatalf("expected 1 skip (genuine conflict recorded, not resolved), got %+v", decisions)
 	}
 	if !strings.Contains(decisions[0].Reason, "manual") {
 		t.Fatalf("reason should name the manual conflictPolicy: %q", decisions[0].Reason)
@@ -323,12 +372,76 @@ func TestSyncBidirectionalManualRecordsConflictWithoutChangingEitherSide(t *test
 	if cm := getHostConfigMap(t, host, "shared-x-default-x-dev"); cm.Data["key"] != "host-value" {
 		t.Fatalf("host must be untouched: %v", cm.Data)
 	}
-	tenantCM := &corev1.ConfigMap{}
 	if err := virtual.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "shared"}, tenantCM); err != nil {
 		t.Fatalf("get virtual: %v", err)
 	}
 	if tenantCM.Data["key"] != "tenant-value" {
 		t.Fatalf("tenant must be untouched: %v", tenantCM.Data)
+	}
+}
+
+// tenant-wins/host-wins are already fully decisive — they must enforce their
+// declared winner on any difference, even a one-sided drift where history
+// alone would otherwise have picked the other side.
+func TestSyncBidirectionalTenantWinsIgnoresOneSidedHostDrift(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "tenant-value"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionBidirectional}
+	if _, err := e.SyncBidirectional(context.Background(), res, "tenant-wins"); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	// Only the host changes — history alone would pull this into the tenant,
+	// but tenant-wins must override that and push instead.
+	hostCM := getHostConfigMap(t, host, "shared-x-default-x-dev")
+	hostCM.Data["key"] = "host-value"
+	if err := host.Update(context.Background(), hostCM); err != nil {
+		t.Fatalf("update host: %v", err)
+	}
+
+	if _, err := e.SyncBidirectional(context.Background(), res, "tenant-wins"); err != nil {
+		t.Fatalf("SyncBidirectional: %v", err)
+	}
+	if cm := getHostConfigMap(t, host, "shared-x-default-x-dev"); cm.Data["key"] != "tenant-value" {
+		t.Fatalf("host = %v, want tenant-wins to override the host's one-sided drift", cm.Data)
+	}
+}
+
+// With no History at all (e.g. explain.recordDecisions was off, so
+// Engine.History was never loaded and stays nil), "manual" must fall back to
+// today's behavior: any difference is ambiguous without a baseline to compare
+// against, so it's left alone rather than guessed at.
+func TestSyncBidirectionalManualWithNoHistoryFallsBackToSkip(t *testing.T) {
+	scheme := testScheme(t)
+	// Both objects already exist, pre-seeded directly — never created via the
+	// engine, so there is no way for it to have recorded a baseline for them.
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "tenant-value"}),
+	).Build()
+	hostCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "team-dev", Name: "shared-x-default-x-dev",
+			Labels:      syncplan.HostLabels(syncplan.ResourceRef{TenantCluster: "dev", VirtualNamespace: "default", Kind: "ConfigMap", Name: "shared"}),
+			Annotations: syncplan.HostAnnotations(syncplan.ResourceRef{VirtualNamespace: "default", Name: "shared"}),
+		},
+		Data: map[string]string{"key": "host-value"},
+	}
+	host := fake.NewClientBuilder().WithScheme(scheme).WithObjects(hostCM).Build()
+
+	e, _ := newEngine(t, virtual, host) // e.History is nil: never populated
+	res := Resource{GVK: configMapGVK, Direction: DirectionBidirectional}
+
+	decisions, err := e.SyncBidirectional(context.Background(), res, "manual")
+	if err != nil {
+		t.Fatalf("SyncBidirectional: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionSkip {
+		t.Fatalf("expected a skip with no history to compare against, got %+v", decisions)
 	}
 }
 

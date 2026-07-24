@@ -83,6 +83,19 @@ type SyncDecisionStatus struct {
 	// Entries holds at most the owning SyncPolicy's explain.retain most
 	// recent decisions, oldest first.
 	Entries []SyncDecisionEntry `json:"entries,omitempty"`
+
+	// LastConverged tracks, per host object name, the tenant and host
+	// resourceVersions the last time a bidirectional pair was confirmed to
+	// agree. It lets the sync engine tell "only one side changed since then"
+	// from a genuine two-sided conflict, instead of comparing only current
+	// tenant vs. current host state. Only populated for bidirectional
+	// resources, and only while explain.retain > 0 (see recordSyncDecisions).
+	LastConverged map[string]ConvergedVersions `json:"lastConverged,omitempty"`
+}
+
+type ConvergedVersions struct {
+	TenantResourceVersion string `json:"tenantResourceVersion"`
+	HostResourceVersion   string `json:"hostResourceVersion"`
 }
 
 type SyncDecisionEntry struct {

@@ -38,7 +38,7 @@ func TestRecordSyncDecisionsCreatesObjectOnFirstCall(t *testing.T) {
 	fc := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.SyncDecision{}).WithObjects(tc).Build()
 	r := &TenantClusterReconciler{Client: fc, Scheme: scheme}
 
-	if err := r.recordSyncDecisions(context.Background(), tc, []syncer.Decision{testDecision("a", "first")}, 10); err != nil {
+	if err := r.recordSyncDecisions(context.Background(), tc, []syncer.Decision{testDecision("a", "first")}, 10, nil); err != nil {
 		t.Fatalf("recordSyncDecisions: %v", err)
 	}
 
@@ -61,10 +61,10 @@ func TestRecordSyncDecisionsAppendsAcrossCalls(t *testing.T) {
 	r := &TenantClusterReconciler{Client: fc, Scheme: scheme}
 	ctx := context.Background()
 
-	if err := r.recordSyncDecisions(ctx, tc, []syncer.Decision{testDecision("a", "first")}, 10); err != nil {
+	if err := r.recordSyncDecisions(ctx, tc, []syncer.Decision{testDecision("a", "first")}, 10, nil); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	if err := r.recordSyncDecisions(ctx, tc, []syncer.Decision{testDecision("b", "second")}, 10); err != nil {
+	if err := r.recordSyncDecisions(ctx, tc, []syncer.Decision{testDecision("b", "second")}, 10, nil); err != nil {
 		t.Fatalf("second call: %v", err)
 	}
 
@@ -86,7 +86,7 @@ func TestRecordSyncDecisionsTrimsToRetain(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		name := string(rune('a' + i))
-		if err := r.recordSyncDecisions(ctx, tc, []syncer.Decision{testDecision(name, name)}, 3); err != nil {
+		if err := r.recordSyncDecisions(ctx, tc, []syncer.Decision{testDecision(name, name)}, 3, nil); err != nil {
 			t.Fatalf("call %d: %v", i, err)
 		}
 	}
@@ -117,7 +117,7 @@ func TestRecordSyncDecisionsNoOpsWhenRetainIsZero(t *testing.T) {
 	fc := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.SyncDecision{}).WithObjects(tc).Build()
 	r := &TenantClusterReconciler{Client: fc, Scheme: scheme}
 
-	if err := r.recordSyncDecisions(context.Background(), tc, []syncer.Decision{testDecision("a", "first")}, 0); err != nil {
+	if err := r.recordSyncDecisions(context.Background(), tc, []syncer.Decision{testDecision("a", "first")}, 0, nil); err != nil {
 		t.Fatalf("recordSyncDecisions: %v", err)
 	}
 
@@ -125,5 +125,47 @@ func TestRecordSyncDecisionsNoOpsWhenRetainIsZero(t *testing.T) {
 	err := fc.Get(context.Background(), types.NamespacedName{Name: tc.Name, Namespace: tc.Namespace}, sd)
 	if err == nil {
 		t.Fatal("retain=0 must not create a SyncDecision object at all")
+	}
+}
+
+func TestLoadConvergenceHistoryEmptyWhenNoSyncDecisionExists(t *testing.T) {
+	scheme := decisionScheme(t)
+	tc := cloudTenant()
+	fc := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc).Build()
+	r := &TenantClusterReconciler{Client: fc, Scheme: scheme}
+
+	history, err := r.loadConvergenceHistory(context.Background(), tc)
+	if err != nil {
+		t.Fatalf("loadConvergenceHistory: %v", err)
+	}
+	if history == nil || len(history) != 0 {
+		t.Fatalf("history = %v, want a non-nil empty map", history)
+	}
+}
+
+func TestRecordSyncDecisionsPersistsAndLoadConvergenceHistoryRoundTrips(t *testing.T) {
+	scheme := decisionScheme(t)
+	tc := cloudTenant()
+	fc := fake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(&v1alpha1.SyncDecision{}).WithObjects(tc).Build()
+	r := &TenantClusterReconciler{Client: fc, Scheme: scheme}
+	ctx := context.Background()
+
+	history := syncer.ConvergenceHistory{
+		"shared-x-default-x-dev": {TenantResourceVersion: "10", HostResourceVersion: "20"},
+	}
+	if err := r.recordSyncDecisions(ctx, tc, []syncer.Decision{testDecision("shared", "converged")}, 10, history); err != nil {
+		t.Fatalf("recordSyncDecisions: %v", err)
+	}
+
+	loaded, err := r.loadConvergenceHistory(ctx, tc)
+	if err != nil {
+		t.Fatalf("loadConvergenceHistory: %v", err)
+	}
+	got, ok := loaded["shared-x-default-x-dev"]
+	if !ok {
+		t.Fatalf("loaded history = %v, missing the persisted entry", loaded)
+	}
+	if got.TenantResourceVersion != "10" || got.HostResourceVersion != "20" {
+		t.Fatalf("loaded entry = %+v, want {10 20}", got)
 	}
 }

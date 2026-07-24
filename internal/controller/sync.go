@@ -62,10 +62,19 @@ func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.Tena
 
 	// explain.recordDecisions toggles decision recording entirely (Events and
 	// the durable SyncDecision store alike) — a nil Recorder is a documented
-	// no-op on the engine side (see Engine.record).
+	// no-op on the engine side (see Engine.record). It also gates loading the
+	// persisted bidirectional convergence history: without it there is
+	// nowhere durable to load from or persist back to, so bidirectional
+	// conflict detection falls back to comparing only current tenant vs.
+	// current host state, exactly as if this feature didn't exist.
 	var recorder syncer.DecisionRecorder
+	var history syncer.ConvergenceHistory
 	if policy.Spec.Explain.RecordDecisions {
 		recorder = &eventDecisionRecorder{recorder: r.Recorder, object: tc}
+		history, err = r.loadConvergenceHistory(ctx, tc)
+		if err != nil {
+			return fmt.Errorf("load sync convergence history: %w", err)
+		}
 	}
 
 	engine := &syncer.Engine{
@@ -76,6 +85,7 @@ func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.Tena
 		Recorder:                 recorder,
 		RequiredRuntimeClassName: profile.RuntimeClassName,
 		RateLimiter:              rateLimiterForFairness(profile.APIFairness),
+		History:                  history,
 	}
 
 	logger := log.FromContext(ctx)
@@ -103,7 +113,7 @@ func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.Tena
 			continue
 		}
 		if policy.Spec.Explain.RecordDecisions {
-			if err := r.recordSyncDecisions(ctx, tc, decisions, policy.Spec.Explain.Retain); err != nil {
+			if err := r.recordSyncDecisions(ctx, tc, decisions, policy.Spec.Explain.Retain, engine.History); err != nil {
 				logger.Error(err, "failed to persist durable sync decisions", "kind", res.GVK.Kind)
 			}
 		}

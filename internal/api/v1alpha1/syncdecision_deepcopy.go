@@ -80,6 +80,13 @@ func (in *SyncDecisionStatus) DeepCopyInto(out *SyncDecisionStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.LastConverged != nil {
+		in, out := &in.LastConverged, &out.LastConverged
+		*out = make(map[string]ConvergedVersions, len(*in))
+		for k, v := range *in {
+			(*out)[k] = v
+		}
+	}
 }
 
 // DeepCopy copies the receiver, creating a new SyncDecisionStatus.
@@ -104,6 +111,21 @@ func (in *SyncDecisionEntry) DeepCopy() *SyncDecisionEntry {
 		return nil
 	}
 	out := new(SyncDecisionEntry)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto copies the receiver, writing into out. in must be non-nil.
+func (in *ConvergedVersions) DeepCopyInto(out *ConvergedVersions) {
+	*out = *in
+}
+
+// DeepCopy copies the receiver, creating a new ConvergedVersions.
+func (in *ConvergedVersions) DeepCopy() *ConvergedVersions {
+	if in == nil {
+		return nil
+	}
+	out := new(ConvergedVersions)
 	in.DeepCopyInto(out)
 	return out
 }

@@ -66,6 +66,24 @@ type DecisionRecorder interface {
 	Record(ctx context.Context, d Decision)
 }
 
+// ConvergedVersions is the tenant and host resourceVersions the last time a
+// bidirectional pair was confirmed to agree.
+type ConvergedVersions struct {
+	TenantResourceVersion string
+	HostResourceVersion   string
+}
+
+// ConvergenceHistory is an in-memory, per-pass view of ConvergedVersions,
+// keyed by host object name, that lets bidirectional sync tell "only one
+// side changed since the last time these agreed" from a genuine two-sided
+// conflict. A nil or empty history means no prior record exists for a given
+// pair — every difference is then treated as needing conflictPolicy, exactly
+// as if this didn't exist. Engine.History is a plain map: the caller loads it
+// once before a sync pass (e.g. from a durable SyncDecision object) and,
+// since map mutations are visible through the same reference, can persist
+// the same map back once after — see internal/controller/sync_decisions.go.
+type ConvergenceHistory map[string]ConvergedVersions
+
 // defaultSkipNamespaces are virtual-cluster system namespaces whose objects are
 // infrastructure of the tenant control plane itself (CoreDNS, leases, RBAC
 // bootstrap) and must not be projected onto the host.
@@ -104,6 +122,11 @@ type Engine struct {
 	// explainable Skip decision and retried on the next sync pass, rather than
 	// blocking the shared reconcile worker.
 	RateLimiter *rate.Limiter
+
+	// History backs bidirectional conflict detection (see
+	// ConvergenceHistory). Nil disables it: every bidirectional difference is
+	// then treated as needing conflictPolicy, exactly as before this existed.
+	History ConvergenceHistory
 }
 
 // SyncToHost performs one convergence pass for res: it projects every eligible
@@ -240,6 +263,9 @@ func (e *Engine) reconcilePair(ctx context.Context, direction Direction, conflic
 		if err := e.HostClient.Create(ctx, host); err != nil {
 			return Decision{}, err
 		}
+		if direction == DirectionBidirectional {
+			e.setConverged(target.Name, virtualObj.GetResourceVersion(), host.GetResourceVersion())
+		}
 		return Decision{Action: ActionCreate, Kind: ref.Kind, Ref: ref, Host: target,
 			Reason: "virtual object has no host counterpart yet"}, nil
 	}
@@ -258,7 +284,7 @@ func (e *Engine) reconcilePair(ctx context.Context, direction Direction, conflic
 	}
 
 	if direction == DirectionToHost {
-		return e.pushToHost(ctx, ref, target, existing, host)
+		return e.pushToHost(ctx, ref, target, virtualObj, existing, host, false)
 	}
 
 	// runtimeClassName is stamped onto the host object by this engine, not by
@@ -273,28 +299,85 @@ func (e *Engine) reconcilePair(ctx context.Context, direction Direction, conflic
 	}
 
 	if syncplan.ContentEqual(virtualObj, comparableHost) {
+		if direction == DirectionBidirectional {
+			e.setConverged(target.Name, virtualObj.GetResourceVersion(), existing.GetResourceVersion())
+		}
 		return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
 			Reason: "tenant and host already agree"}, nil
 	}
 
-	switch {
-	case direction == DirectionFromHost:
-		return e.pullToTenant(ctx, ref, target, virtualObj, comparableHost, "host is authoritative for this direction")
-	case conflictPolicy == "tenant-wins":
-		return e.pushToHost(ctx, ref, target, existing, host)
-	case conflictPolicy == "host-wins":
-		return e.pullToTenant(ctx, ref, target, virtualObj, comparableHost, `conflictPolicy "host-wins": pulled the host's state into the tenant`)
-	default:
-		return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
-			Reason: `tenant and host disagree; conflictPolicy is "manual" (or unset) so neither side was changed`}, nil
+	if direction == DirectionFromHost {
+		return e.pullToTenant(ctx, ref, target, virtualObj, comparableHost, "host is authoritative for this direction", false)
 	}
+	return e.reconcileBidirectionalConflict(ctx, conflictPolicy, ref, target, virtualObj, existing, comparableHost, host)
+}
+
+// reconcileBidirectionalConflict decides what to do once a bidirectional
+// pair's content is known to currently differ.
+//
+// tenant-wins and host-wins are already fully decisive — the user declared an
+// unconditional winner — so they enforce that winner on any difference,
+// exactly as before history existed; there is nothing ambiguous left for
+// history to resolve.
+//
+// "manual" (the default) is different: its whole point is minimizing how
+// often a human needs to be bothered. If History has a record of the last
+// time tenant and host agreed, and only one side's resourceVersion has moved
+// since, that side's change is propagated automatically — a one-sided change
+// isn't really a conflict, just an ordinary update the other side hasn't
+// caught up to yet. Only when both sides have moved since the last
+// known-good point — or no history exists at all — does "manual" actually
+// skip and leave both sides alone.
+//
+// resourceVersion is an opaque, monotonically-changing marker for "has
+// anyone written this object since I last looked," which is exactly what's
+// needed here — but it isn't a content hash: an edit to some field outside
+// what ContentEqual compares (a label, say) would also count as "changed."
+// That's a rare, acceptable false positive (falling back to a skip), not a
+// false negative (silently missing a real change).
+func (e *Engine) reconcileBidirectionalConflict(ctx context.Context, conflictPolicy string, ref syncplan.ResourceRef, target syncplan.HostTarget, virtualObj, existing, comparableHost, host *unstructured.Unstructured) (Decision, error) {
+	switch conflictPolicy {
+	case "tenant-wins":
+		return e.pushToHost(ctx, ref, target, virtualObj, existing, host, true)
+	case "host-wins":
+		return e.pullToTenant(ctx, ref, target, virtualObj, comparableHost,
+			`conflictPolicy "host-wins": pulled the host's state into the tenant`, true)
+	}
+
+	if last, ok := e.History[target.Name]; ok {
+		tenantChanged := virtualObj.GetResourceVersion() != last.TenantResourceVersion
+		hostChanged := existing.GetResourceVersion() != last.HostResourceVersion
+		switch {
+		case tenantChanged && !hostChanged:
+			return e.pushToHost(ctx, ref, target, virtualObj, existing, host, true)
+		case hostChanged && !tenantChanged:
+			return e.pullToTenant(ctx, ref, target, virtualObj, comparableHost,
+				"only the host changed since tenant and host last agreed; conflictPolicy \"manual\" only holds back a genuine two-sided conflict", true)
+		}
+		// Both moved (or, in principle, neither — but ContentEqual already
+		// ruled that out before this was called): a genuine conflict.
+	}
+	return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
+		Reason: `tenant and host disagree; conflictPolicy is "manual" (or unset) so neither side was changed`}, nil
+}
+
+// setConverged records the current tenant/host resourceVersions as the new
+// converged baseline for hostName. Deliberately not called for a "manual"
+// conflict left unresolved: that would make the next pass forget there was
+// ever a disagreement, instead of continuing to flag it until it's actually
+// resolved.
+func (e *Engine) setConverged(hostName, tenantRV, hostRV string) {
+	if e.History == nil {
+		e.History = ConvergenceHistory{}
+	}
+	e.History[hostName] = ConvergedVersions{TenantResourceVersion: tenantRV, HostResourceVersion: hostRV}
 }
 
 // pushToHost writes the tenant's current state to the host, preserving the
 // host-allocated fields only the host's own cluster can assign (clusterIP and
 // friends) and the existing object's resourceVersion for an optimistic
 // concurrency check.
-func (e *Engine) pushToHost(ctx context.Context, ref syncplan.ResourceRef, target syncplan.HostTarget, existingHost, host *unstructured.Unstructured) (Decision, error) {
+func (e *Engine) pushToHost(ctx context.Context, ref syncplan.ResourceRef, target syncplan.HostTarget, virtualObj, existingHost, host *unstructured.Unstructured, trackHistory bool) (Decision, error) {
 	if d, limited := e.rateLimited(ref, target); limited {
 		return d, nil
 	}
@@ -302,6 +385,9 @@ func (e *Engine) pushToHost(ctx context.Context, ref syncplan.ResourceRef, targe
 	syncplan.AdoptHostAllocatedFields(existingHost, host)
 	if err := e.HostClient.Update(ctx, host); err != nil {
 		return Decision{}, err
+	}
+	if trackHistory {
+		e.setConverged(target.Name, virtualObj.GetResourceVersion(), host.GetResourceVersion())
 	}
 	return Decision{Action: ActionUpdate, Kind: ref.Kind, Ref: ref, Host: target,
 		Reason: "reconciled host object to match virtual source"}, nil
@@ -311,13 +397,16 @@ func (e *Engine) pushToHost(ctx context.Context, ref syncplan.ResourceRef, targe
 // preserving the tenant's own metadata (labels, annotations, resourceVersion):
 // unlike a host object tenantplane owns outright, the tenant object is
 // something the tenant still manages — only its content is reflected back.
-func (e *Engine) pullToTenant(ctx context.Context, ref syncplan.ResourceRef, target syncplan.HostTarget, virtualObj, existingHost *unstructured.Unstructured, reason string) (Decision, error) {
+func (e *Engine) pullToTenant(ctx context.Context, ref syncplan.ResourceRef, target syncplan.HostTarget, virtualObj, existingHost *unstructured.Unstructured, reason string, trackHistory bool) (Decision, error) {
 	if d, limited := e.rateLimited(ref, target); limited {
 		return d, nil
 	}
 	merged := syncplan.MergeHostContentIntoTenant(existingHost, virtualObj)
 	if err := e.VirtualClient.Update(ctx, merged); err != nil {
 		return Decision{}, err
+	}
+	if trackHistory {
+		e.setConverged(target.Name, merged.GetResourceVersion(), existingHost.GetResourceVersion())
 	}
 	return Decision{Action: ActionUpdate, Kind: ref.Kind, Ref: ref, Host: target, Reason: reason}, nil
 }
