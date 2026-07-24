@@ -113,21 +113,36 @@ func TestSupportConditionsDoNotFlagPSAEnforcedControls(t *testing.T) {
 	}
 }
 
-func TestSupportConditionsFlagUnimplementedSyncSettings(t *testing.T) {
+func TestSupportConditionsDoNotFlagImplementedSyncSettings(t *testing.T) {
+	// toHost, fromHost, bidirectional, and all three conflictPolicy values are
+	// all implemented now; only driftDetection.interval and explain.retain
+	// remain unhonored (see the other test below).
 	tc := cloudTenant()
 	policy := supportedPolicy()
 	policy.Spec.ConflictPolicy = "host-wins"
+	policy.Spec.Resources = append(policy.Spec.Resources,
+		v1alpha1.SyncedResource{APIVersion: "v1", Kind: "Service", Direction: "bidirectional"},
+		v1alpha1.SyncedResource{APIVersion: "v1", Kind: "ConfigMap", Direction: "fromHost"})
+	setSupportConditions(tc, supportedProfile(), policy)
+
+	cond := condition(tc, "SyncSupported")
+	if cond == nil || cond.Status != string(corev1.ConditionTrue) {
+		t.Fatalf("SyncSupported = %+v, want True", cond)
+	}
+}
+
+func TestSupportConditionsFlagUnimplementedSyncSettings(t *testing.T) {
+	tc := cloudTenant()
+	policy := supportedPolicy()
 	policy.Spec.DriftDetection = v1alpha1.DriftDetectionSpec{Enabled: true, Interval: "30s"}
 	policy.Spec.Explain = v1alpha1.ExplainSpec{RecordDecisions: true, Retain: 1000}
-	policy.Spec.Resources = append(policy.Spec.Resources,
-		v1alpha1.SyncedResource{APIVersion: "v1", Kind: "Service", Direction: "bidirectional"})
 	setSupportConditions(tc, supportedProfile(), policy)
 
 	cond := condition(tc, "SyncSupported")
 	if cond == nil || cond.Status != string(corev1.ConditionFalse) {
 		t.Fatalf("SyncSupported = %+v, want False", cond)
 	}
-	for _, want := range []string{"Service (bidirectional)", "host-wins", "driftDetection.interval", "explain.retain"} {
+	for _, want := range []string{"driftDetection.interval", "explain.retain"} {
 		if !strings.Contains(cond.Message, want) {
 			t.Fatalf("message missing %q: %q", want, cond.Message)
 		}

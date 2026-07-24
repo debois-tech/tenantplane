@@ -63,6 +63,31 @@ For each `toHost` resource kind, one pass does:
 Individual object errors are aggregated, so one bad object doesn't abandon the
 rest of the pass.
 
+## fromHost and bidirectional
+
+Discovery always enumerates the tenant's own objects — even for `fromHost` and
+`bidirectional` — so deleting the tenant object removes the host mirror too, in
+every direction. Where they differ is what happens once both sides exist:
+
+- **`fromHost`**: a missing host mirror is bootstrap-created from the tenant
+  (there is nothing on the host yet to prefer), exactly like `toHost`'s first
+  create. Once it exists, every later pass pulls the host's current content
+  into the tenant instead of pushing the tenant's content out — the host is
+  authoritative from then on.
+- **`bidirectional`**: same bootstrap-create, but afterward the engine compares
+  tenant and host on every pass. If they already agree, nothing happens. If
+  they disagree, [`conflictPolicy`](/docs/concepts/syncpolicy/#conflict-policy)
+  decides which way it resolves.
+
+Pulling host content into the tenant only ever replaces the object's *content*
+(everything but `metadata`/`status`) — the tenant's own labels, annotations, and
+resourceVersion are left alone, since the tenant object is something the tenant
+still manages, not something tenantplane owns outright the way a host mirror is.
+
+There is no persisted history of prior syncs, so a real, already-resolved
+conflict looks the same to the engine as one side having drifted alone: it only
+ever compares *current* state on both sides.
+
 ### Name collisions
 
 The host name is deterministic but not perfectly injective: names over the

@@ -56,7 +56,7 @@ fields.
 | `spec.explain.retain` | int | How many decisions to retain. |
 | `spec.resources[].apiVersion` | string | e.g. `v1`. |
 | `spec.resources[].kind` | string | e.g. `Pod`, `ConfigMap`. |
-| `spec.resources[].direction` | string | `toHost` (implemented) \| `fromHost` \| `bidirectional`. |
+| `spec.resources[].direction` | string | `toHost` \| `fromHost` \| `bidirectional` — all implemented. |
 
 ## Reverse-mapping metadata
 

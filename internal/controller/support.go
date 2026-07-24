@@ -83,7 +83,12 @@ func setIsolationCondition(tc *v1alpha1.TenantCluster, profile *v1alpha1.Isolati
 }
 
 // setSyncSupportCondition reports which parts of the referenced SyncPolicy the
-// engine actually honors today.
+// engine actually honors today. All three directions (toHost, fromHost,
+// bidirectional) and all three conflictPolicy values are implemented; what
+// remains unimplemented is driftDetection.interval and explain.retain (see
+// below), plus any declared direction/kind combination the CRD's enum would
+// already reject before this ever runs (kept here only as a defensive,
+// unreachable-in-practice check).
 func setSyncSupportCondition(tc *v1alpha1.TenantCluster, policy *v1alpha1.SyncPolicy) {
 	if policy == nil {
 		return
@@ -91,17 +96,16 @@ func setSyncSupportCondition(tc *v1alpha1.TenantCluster, policy *v1alpha1.SyncPo
 
 	var skipped []string
 	for _, res := range policy.Spec.Resources {
-		if syncer.Direction(res.Direction) != syncer.DirectionToHost {
+		switch syncer.Direction(res.Direction) {
+		case syncer.DirectionToHost, syncer.DirectionFromHost, syncer.DirectionBidirectional:
+		default:
 			skipped = append(skipped, fmt.Sprintf("%s %s (%s)", res.APIVersion, res.Kind, res.Direction))
 		}
 	}
 
 	var notes []string
 	if len(skipped) > 0 {
-		notes = append(notes, fmt.Sprintf(`only "toHost" sync is implemented; these declared resources are not synced: %s`, strings.Join(skipped, ", ")))
-	}
-	if policy.Spec.ConflictPolicy != "" && policy.Spec.ConflictPolicy != "manual" {
-		notes = append(notes, fmt.Sprintf("conflictPolicy %q is not yet honored: tenant state overwrites managed host objects and unmanaged collisions are skipped", policy.Spec.ConflictPolicy))
+		notes = append(notes, fmt.Sprintf(`unrecognized sync direction; these declared resources are not synced: %s`, strings.Join(skipped, ", ")))
 	}
 	if policy.Spec.DriftDetection.Enabled && policy.Spec.DriftDetection.Interval != "" {
 		notes = append(notes, "driftDetection.interval is not yet honored; sync runs on the controller's fixed resync cadence")

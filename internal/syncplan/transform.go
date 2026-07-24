@@ -273,6 +273,60 @@ func ReverseLookup(host *unstructured.Unstructured) (ref ResourceRef, ok bool) {
 	}, true
 }
 
+// contentFrom returns obj's non-metadata content: every top-level field
+// except apiVersion, kind, metadata, and status. This is deliberately generic
+// across Kinds instead of hand-listing field names per Kind: a Pod's content
+// is "spec"; a ConfigMap's is "data"/"binaryData"; a Secret's is
+// "data"/"stringData"/"type" — Kubernetes objects have no other top-level
+// categories to worry about missing.
+func contentFrom(obj *unstructured.Unstructured) map[string]interface{} {
+	out := make(map[string]interface{}, len(obj.Object))
+	for k, v := range obj.Object {
+		switch k {
+		case "apiVersion", "kind", "metadata", "status":
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// ContentEqual reports whether a and b already agree on everything but
+// metadata/status, once each side's own host-allocated fields (e.g. Service
+// clusterIP — the host and the tenant's own virtual cluster each allocate
+// their own, from different ranges, so these can never legitimately match)
+// are excluded from the comparison. Used by fromHost/bidirectional sync to
+// decide whether there is anything to reconcile at all before consulting
+// conflictPolicy.
+func ContentEqual(a, b *unstructured.Unstructured) bool {
+	ac, bc := a.DeepCopy(), b.DeepCopy()
+	stripHostAllocatedSpecFields(a.GetKind(), ac)
+	stripHostAllocatedSpecFields(b.GetKind(), bc)
+	return reflect.DeepEqual(contentFrom(ac), contentFrom(bc))
+}
+
+// MergeHostContentIntoTenant returns a copy of tenantObj with its content
+// (everything but metadata/status) replaced by hostObj's, after stripping
+// fields the host's own cluster allocates that the tenant's own (differently
+// addressed) virtual cluster could never accept verbatim. The tenant's own
+// metadata — labels, annotations, name, namespace, resourceVersion — is left
+// untouched: fromHost/bidirectional reflect an object's content back into
+// something the tenant still owns, they do not replace its identity the way
+// BuildHostObject does for a host object tenantplane owns outright.
+func MergeHostContentIntoTenant(hostObj, tenantObj *unstructured.Unstructured) *unstructured.Unstructured {
+	merged := tenantObj.DeepCopy()
+	hostCopy := hostObj.DeepCopy()
+	stripHostAllocatedSpecFields(hostObj.GetKind(), hostCopy)
+
+	for k := range contentFrom(merged) {
+		delete(merged.Object, k)
+	}
+	for k, v := range contentFrom(hostCopy) {
+		merged.Object[k] = v
+	}
+	return merged
+}
+
 // mergeMap returns base with every key from overlay set, allocating a new map
 // when base is nil so callers never share tenantplane's constant maps.
 func mergeMap(base, overlay map[string]string) map[string]string {

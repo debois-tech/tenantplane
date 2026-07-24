@@ -298,3 +298,66 @@ func TestAdoptHostAllocatedFieldsPodPreservesImmutableSpecAndUpdatesImage(t *tes
 		t.Fatalf("tolerations = %v, want the existing one plus the new addition (2 total)", tolerations)
 	}
 }
+
+func TestContentEqualIgnoresMetadataAndHostAllocatedFields(t *testing.T) {
+	a := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1", "kind": "Service",
+		"metadata": map[string]interface{}{"name": "web", "labels": map[string]interface{}{"a": "1"}},
+		"spec": map[string]interface{}{
+			"selector":  map[string]interface{}{"app": "web"},
+			"clusterIP": "10.96.1.1",
+		},
+	}}
+	b := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1", "kind": "Service",
+		"metadata": map[string]interface{}{"name": "web-x-default-x-dev", "labels": map[string]interface{}{"b": "2"}},
+		"spec": map[string]interface{}{
+			"selector":  map[string]interface{}{"app": "web"},
+			"clusterIP": "10.96.9.9", // host-allocated: different values must not count as a diff
+		},
+	}}
+	if !ContentEqual(a, b) {
+		t.Fatal("ContentEqual must ignore metadata and host-allocated spec fields")
+	}
+
+	b2 := b.DeepCopy()
+	_ = unstructured.SetNestedField(b2.Object, "db", "spec", "selector", "app")
+	if ContentEqual(a, b2) {
+		t.Fatal("ContentEqual must still catch a real content difference")
+	}
+}
+
+func TestMergeHostContentIntoTenantPreservesTenantMetadata(t *testing.T) {
+	host := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name": "shared-x-default-x-dev", "namespace": "team-dev",
+			"labels": map[string]interface{}{"app.kubernetes.io/managed-by": "tenantplane"},
+		},
+		"data": map[string]interface{}{"key": "from-host"},
+	}}
+	tenant := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1", "kind": "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name": "shared", "namespace": "default", "resourceVersion": "42",
+			"labels": map[string]interface{}{"owner": "tenant-team"},
+		},
+		"data": map[string]interface{}{"key": "stale-tenant-value"},
+	}}
+
+	merged := MergeHostContentIntoTenant(host, tenant)
+
+	if merged.GetName() != "shared" || merged.GetNamespace() != "default" {
+		t.Fatalf("identity = %s/%s, want the tenant's own name/namespace preserved", merged.GetNamespace(), merged.GetName())
+	}
+	if merged.GetResourceVersion() != "42" {
+		t.Fatal("resourceVersion must be preserved so the update is a proper optimistic-concurrency check")
+	}
+	if merged.GetLabels()["owner"] != "tenant-team" {
+		t.Fatal("the tenant's own labels must be preserved, not replaced with the host object's")
+	}
+	data, _, _ := unstructured.NestedMap(merged.Object, "data")
+	if data["key"] != "from-host" {
+		t.Fatalf("data = %v, want the host's content reflected in", data)
+	}
+}

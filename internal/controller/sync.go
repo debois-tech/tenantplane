@@ -73,20 +73,28 @@ func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.Tena
 	logger := log.FromContext(ctx)
 	var firstErr error
 	for _, res := range resources {
-		if res.Direction != syncer.DirectionToHost {
-			// Accepted in the SyncPolicy but not yet implemented; skip without
-			// pretending it happened.
+		var decisions []syncer.Decision
+		var err error
+		switch res.Direction {
+		case syncer.DirectionToHost:
+			decisions, err = engine.SyncToHost(ctx, res)
+		case syncer.DirectionFromHost:
+			decisions, err = engine.SyncFromHost(ctx, res)
+		case syncer.DirectionBidirectional:
+			decisions, err = engine.SyncBidirectional(ctx, res, policy.Spec.ConflictPolicy)
+		default:
+			// Accepted in the SyncPolicy but not a real direction; skip
+			// without pretending it happened.
 			continue
 		}
-		decisions, err := engine.SyncToHost(ctx, res)
 		if err != nil {
-			logger.Error(err, "sync pass failed", "kind", res.GVK.Kind)
+			logger.Error(err, "sync pass failed", "kind", res.GVK.Kind, "direction", res.Direction)
 			if firstErr == nil {
 				firstErr = err
 			}
 			continue
 		}
-		logger.V(1).Info("sync pass complete", "kind", res.GVK.Kind, "decisions", len(decisions))
+		logger.V(1).Info("sync pass complete", "kind", res.GVK.Kind, "direction", res.Direction, "decisions", len(decisions))
 	}
 	return firstErr
 }

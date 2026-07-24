@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -180,10 +181,244 @@ func TestSyncToHostGarbageCollectsOrphans(t *testing.T) {
 	}
 }
 
-func TestSyncToHostRejectsUnimplementedDirection(t *testing.T) {
+func TestSyncToHostRejectsWrongDirection(t *testing.T) {
 	e, _ := newEngine(t, nil, nil)
 	if _, err := e.SyncToHost(context.Background(), Resource{GVK: configMapGVK, Direction: DirectionBidirectional}); err == nil {
-		t.Fatal("expected error for unimplemented direction")
+		t.Fatal("SyncToHost must reject a Resource declared for a different direction")
+	}
+}
+
+func TestSyncFromHostRejectsWrongDirection(t *testing.T) {
+	e, _ := newEngine(t, nil, nil)
+	if _, err := e.SyncFromHost(context.Background(), Resource{GVK: configMapGVK, Direction: DirectionToHost}); err == nil {
+		t.Fatal("SyncFromHost must reject a Resource declared for a different direction")
+	}
+}
+
+func TestSyncBidirectionalRejectsWrongDirection(t *testing.T) {
+	e, _ := newEngine(t, nil, nil)
+	if _, err := e.SyncBidirectional(context.Background(), Resource{GVK: configMapGVK, Direction: DirectionToHost}, "manual"); err == nil {
+		t.Fatal("SyncBidirectional must reject a Resource declared for a different direction")
+	}
+}
+
+// fromHost bootstraps the host mirror from the tenant on first sight (there is
+// nothing on the host yet to prefer), exactly like SyncToHost's first create.
+func TestSyncFromHostBootstrapsFromTenant(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "from-tenant"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionFromHost}
+
+	decisions, err := e.SyncFromHost(context.Background(), res)
+	if err != nil {
+		t.Fatalf("SyncFromHost: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionCreate {
+		t.Fatalf("expected 1 create decision, got %+v", decisions)
+	}
+	if cm := getHostConfigMap(t, host, "shared-x-default-x-dev"); cm.Data["key"] != "from-tenant" {
+		t.Fatalf("host bootstrap = %v, want from-tenant", cm.Data)
+	}
+}
+
+// Once the host mirror exists, fromHost pulls its content into the tenant on
+// every subsequent pass — the host is authoritative from then on.
+func TestSyncFromHostPullsHostChangesIntoTenant(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "v1"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionFromHost}
+	if _, err := e.SyncFromHost(context.Background(), res); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	// Someone edits the host mirror directly (a host admin, or another system).
+	hostCM := getHostConfigMap(t, host, "shared-x-default-x-dev")
+	hostCM.Data["key"] = "changed-on-host"
+	if err := host.Update(context.Background(), hostCM); err != nil {
+		t.Fatalf("update host: %v", err)
+	}
+
+	decisions, err := e.SyncFromHost(context.Background(), res)
+	if err != nil {
+		t.Fatalf("SyncFromHost: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionUpdate {
+		t.Fatalf("expected 1 update decision, got %+v", decisions)
+	}
+
+	tenantCM := &corev1.ConfigMap{}
+	if err := virtual.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "shared"}, tenantCM); err != nil {
+		t.Fatalf("get virtual: %v", err)
+	}
+	if tenantCM.Data["key"] != "changed-on-host" {
+		t.Fatalf("tenant not updated from host: %v", tenantCM.Data)
+	}
+}
+
+// A no-op pass (tenant and host already agree) must not report an update or
+// touch either side.
+func TestSyncFromHostSkipsWhenAlreadyEqual(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "v1"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionFromHost}
+	if _, err := e.SyncFromHost(context.Background(), res); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	decisions, err := e.SyncFromHost(context.Background(), res)
+	if err != nil {
+		t.Fatalf("SyncFromHost: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionSkip {
+		t.Fatalf("expected 1 skip decision, got %+v", decisions)
+	}
+}
+
+func TestSyncBidirectionalManualRecordsConflictWithoutChangingEitherSide(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "tenant-value"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionBidirectional}
+	if _, err := e.SyncBidirectional(context.Background(), res, "manual"); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	hostCM := getHostConfigMap(t, host, "shared-x-default-x-dev")
+	hostCM.Data["key"] = "host-value"
+	if err := host.Update(context.Background(), hostCM); err != nil {
+		t.Fatalf("update host: %v", err)
+	}
+
+	decisions, err := e.SyncBidirectional(context.Background(), res, "manual")
+	if err != nil {
+		t.Fatalf("SyncBidirectional: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionSkip {
+		t.Fatalf("expected 1 skip (conflict recorded, not resolved), got %+v", decisions)
+	}
+	if !strings.Contains(decisions[0].Reason, "manual") {
+		t.Fatalf("reason should name the manual conflictPolicy: %q", decisions[0].Reason)
+	}
+
+	// Neither side may have changed.
+	if cm := getHostConfigMap(t, host, "shared-x-default-x-dev"); cm.Data["key"] != "host-value" {
+		t.Fatalf("host must be untouched: %v", cm.Data)
+	}
+	tenantCM := &corev1.ConfigMap{}
+	if err := virtual.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "shared"}, tenantCM); err != nil {
+		t.Fatalf("get virtual: %v", err)
+	}
+	if tenantCM.Data["key"] != "tenant-value" {
+		t.Fatalf("tenant must be untouched: %v", tenantCM.Data)
+	}
+}
+
+func TestSyncBidirectionalTenantWinsPushesToHost(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "tenant-value"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionBidirectional}
+	if _, err := e.SyncBidirectional(context.Background(), res, "tenant-wins"); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	hostCM := getHostConfigMap(t, host, "shared-x-default-x-dev")
+	hostCM.Data["key"] = "host-value"
+	if err := host.Update(context.Background(), hostCM); err != nil {
+		t.Fatalf("update host: %v", err)
+	}
+
+	if _, err := e.SyncBidirectional(context.Background(), res, "tenant-wins"); err != nil {
+		t.Fatalf("SyncBidirectional: %v", err)
+	}
+	if cm := getHostConfigMap(t, host, "shared-x-default-x-dev"); cm.Data["key"] != "tenant-value" {
+		t.Fatalf("host = %v, want the tenant's value pushed over the host's", cm.Data)
+	}
+}
+
+func TestSyncBidirectionalHostWinsPullsIntoTenant(t *testing.T) {
+	scheme := testScheme(t)
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(
+		virtualConfigMap("default", "shared", map[string]string{"key": "tenant-value"}),
+	).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	res := Resource{GVK: configMapGVK, Direction: DirectionBidirectional}
+	if _, err := e.SyncBidirectional(context.Background(), res, "host-wins"); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	hostCM := getHostConfigMap(t, host, "shared-x-default-x-dev")
+	hostCM.Data["key"] = "host-value"
+	if err := host.Update(context.Background(), hostCM); err != nil {
+		t.Fatalf("update host: %v", err)
+	}
+
+	if _, err := e.SyncBidirectional(context.Background(), res, "host-wins"); err != nil {
+		t.Fatalf("SyncBidirectional: %v", err)
+	}
+	tenantCM := &corev1.ConfigMap{}
+	if err := virtual.Get(context.Background(), client.ObjectKey{Namespace: "default", Name: "shared"}, tenantCM); err != nil {
+		t.Fatalf("get virtual: %v", err)
+	}
+	if tenantCM.Data["key"] != "host-value" {
+		t.Fatalf("tenant = %v, want the host's value pulled over the tenant's", tenantCM.Data)
+	}
+}
+
+// A Pod synced bidirectionally alongside a RequiredRuntimeClassName injection
+// must not see the engine's own injected field as a permanent, unresolvable
+// "conflict" between tenant and host.
+func TestSyncBidirectionalPodIgnoresInjectedRuntimeClassName(t *testing.T) {
+	scheme := testScheme(t)
+	podGVK := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "web"},
+		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "app", Image: "nginx:1.24"}}},
+	}
+	virtual := fake.NewClientBuilder().WithScheme(scheme).WithObjects(pod).Build()
+	host := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+	e, _ := newEngine(t, virtual, host)
+	e.RequiredRuntimeClassName = "kata-qemu"
+	res := Resource{GVK: podGVK, Direction: DirectionBidirectional}
+
+	if _, err := e.SyncBidirectional(context.Background(), res, "manual"); err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+
+	// Nothing about the tenant or host Pod changed beyond the engine's own
+	// injection — this must be a Skip ("already agree"), never a conflict.
+	decisions, err := e.SyncBidirectional(context.Background(), res, "manual")
+	if err != nil {
+		t.Fatalf("SyncBidirectional: %v", err)
+	}
+	if len(decisions) != 1 || decisions[0].Action != ActionSkip || decisions[0].Reason != "tenant and host already agree" {
+		t.Fatalf("expected a quiet 'already agree' skip, got %+v", decisions)
 	}
 }
 

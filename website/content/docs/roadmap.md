@@ -11,26 +11,32 @@ not a commitment to dates or ordering.
 
 - Custom resources: `TenantCluster`, `IsolationProfile`, `SyncPolicy`.
 - Controller that reconciles a shared-mode k3s control plane (StatefulSet +
-  headless Service).
+  headless Service) in a dedicated control-plane namespace, separate from
+  tenant workloads, so Pod Security is enforced at the profile's real
+  declared level (including `restricted`).
 - Isolation enforcement: default-deny NetworkPolicy, ResourceQuota, LimitRange,
-  and Pod Security Admission labels.
+  Pod Security Admission labels, and runtimeClassName/apiFairness enforced by
+  both the sync engine and a ValidatingAdmissionPolicy backstop (Kubernetes
+  1.30+).
 - Tenant kubeconfig extraction into a host Secret.
-- Deterministic host-ward sync (`toHost`) with orphan garbage collection.
+- Full sync engine: `toHost`, `fromHost`, and `bidirectional` directions, all
+  with orphan garbage collection; `bidirectional` honors `conflictPolicy`
+  (`manual`, `tenant-wins`, `host-wins`).
 - Sync decisions recorded as Kubernetes Events.
+- Controller RBAC narrowed to the namespaces it actually manages, with the
+  same ValidatingAdmissionPolicy backstop pattern hardening it further.
 - CLI: resource rendering and offline `explain-sync`.
 - Managed Kubernetes support (EKS, AKS, GKE): storage class selection,
   LoadBalancer exposure with cloud annotations, extra TLS SANs.
 
 ## Next
 
-- **Bidirectional sync** — `fromHost` and `bidirectional` directions with the
-  declared conflict policy honored.
-- **SyncDecision records** — a durable, queryable decision stream beyond Events.
-- **Expanded isolation enforcement** — runtime class, host-path, and privileged
-  container controls wired through to admission.
-- **Dedicated control-plane namespaces** — separate the k3s control plane from
-  tenant workloads so Pod Security can be enforced at `restricted` (today the
-  enforce label is capped at `baseline`).
+- **SyncDecision records** — a durable, queryable decision stream beyond
+  Events, which would also let conflict detection compare against the last
+  synced state instead of only current tenant vs. current host state.
+- **Honor `driftDetection.interval` and `explain.retain`** — sync currently
+  runs on the controller's fixed resync cadence and decisions are Events with
+  cluster-default retention regardless of what a SyncPolicy declares.
 - **Kubernetes version selection** — map `kubernetesVersion` to a k3s image.
 - **Multi-replica / HA control planes** and non-SQLite datastores.
 

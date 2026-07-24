@@ -59,7 +59,4 @@ spec:
                       direction:
                         type: string
                         enum: ["toHost", "fromHost", "bidirectional"]
-                        x-kubernetes-validations:
-                          - rule: "self == 'toHost'"
-                            message: 'only "toHost" is implemented today; "fromHost" and "bidirectional" are on the roadmap and are rejected rather than silently skipped'
 

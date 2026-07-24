@@ -111,12 +111,54 @@ type Engine struct {
 // engine previously created whose virtual source is gone. It returns the
 // decisions made, most useful for tests and status. Errors from individual
 // objects are aggregated so one bad object does not abandon the rest of the
-// pass.
+// pass. The tenant is authoritative: every pass pushes its current state to
+// the host, full stop.
 func (e *Engine) SyncToHost(ctx context.Context, res Resource) ([]Decision, error) {
 	if res.Direction != DirectionToHost {
 		return nil, fmt.Errorf("syncer: direction %q is not implemented (only %q)", res.Direction, DirectionToHost)
 	}
+	return e.syncPass(ctx, res, "")
+}
 
+// SyncFromHost performs one convergence pass in the opposite direction: the
+// host is authoritative. The tenant object still has to exist for tenantplane
+// to know a pair should exist at all (discovery always enumerates the
+// tenant's own objects, exactly like SyncToHost) — but once a host mirror
+// exists, this pulls its current content back into the tenant on every pass,
+// rather than pushing the tenant's content out. A host mirror that does not
+// exist yet is bootstrap-created from the tenant's current state (there is
+// nothing on the host yet to prefer), exactly like SyncToHost's first create.
+func (e *Engine) SyncFromHost(ctx context.Context, res Resource) ([]Decision, error) {
+	if res.Direction != DirectionFromHost {
+		return nil, fmt.Errorf("syncer: direction %q is not implemented (only %q)", res.Direction, DirectionFromHost)
+	}
+	return e.syncPass(ctx, res, "")
+}
+
+// SyncBidirectional performs one convergence pass where either side may have
+// drifted: if tenant and host already agree, nothing happens. If they
+// disagree, conflictPolicy decides — "tenant-wins" pushes to the host (like
+// SyncToHost), "host-wins" pulls into the tenant (like SyncFromHost), and
+// "manual" (the safe default) touches neither side and just records that
+// they disagree, exactly as documented in the SyncPolicy conflictPolicy
+// field. There is no persisted history of prior syncs to tell "only the
+// tenant changed" from "only the host changed" from "both changed" — every
+// pass simply compares current state, so "manual" will report a conflict
+// even when, with more context, one side's change would have been obvious.
+func (e *Engine) SyncBidirectional(ctx context.Context, res Resource, conflictPolicy string) ([]Decision, error) {
+	if res.Direction != DirectionBidirectional {
+		return nil, fmt.Errorf("syncer: direction %q is not implemented (only %q)", res.Direction, DirectionBidirectional)
+	}
+	return e.syncPass(ctx, res, conflictPolicy)
+}
+
+// syncPass is the shared driver behind all three directions: it always
+// discovers pairs by enumerating the tenant's own objects (so deleting the
+// tenant object removes the host mirror too, in every direction), and always
+// establishes a missing host mirror by bootstrapping from the tenant. Only
+// what happens when both sides already exist — reconcilePair — differs by
+// direction.
+func (e *Engine) syncPass(ctx context.Context, res Resource, conflictPolicy string) ([]Decision, error) {
 	virtual := &unstructured.UnstructuredList{}
 	virtual.SetGroupVersionKind(listGVK(res.GVK))
 	if err := e.VirtualClient.List(ctx, virtual); err != nil {
@@ -151,9 +193,9 @@ func (e *Engine) SyncToHost(ctx context.Context, res Resource) ([]Decision, erro
 		}
 		desiredHostNames[host.GetName()] = true
 
-		d, err := e.applyHost(ctx, ref, host)
+		d, err := e.reconcilePair(ctx, res.Direction, conflictPolicy, ref, obj, host)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("%s/%s: apply host object: %w", obj.GetNamespace(), obj.GetName(), err))
+			errs = append(errs, fmt.Errorf("%s/%s: reconcile: %w", obj.GetNamespace(), obj.GetName(), err))
 			continue
 		}
 		e.record(ctx, d)
@@ -172,16 +214,19 @@ func (e *Engine) SyncToHost(ctx context.Context, res Resource) ([]Decision, erro
 	return decisions, aggregate(errs)
 }
 
-// applyHost creates or updates one host object and returns the decision. It
-// preserves the existing resourceVersion on update so the write is a
-// conflict-checked replacement of the fields tenantplane owns.
+// reconcilePair converges one already-identified virtual/host pair. host is
+// the desired host object built from the tenant's current state — used
+// as-is when creating (nothing on the host yet to prefer) or pushing
+// (toHost, or bidirectional's tenant-wins). virtualObj is the tenant's live
+// object — pulled onto (fromHost, or bidirectional's host-wins).
 //
-// Before overwriting an existing object it verifies provenance: the host name is
-// deterministic but not injective (long names are hash-truncated), so two
-// distinct tenant objects could in principle target the same host name, and an
-// unrelated object could already occupy it. In either case applyHost refuses to
-// clobber and records an explainable Skip rather than silently destroying data.
-func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *unstructured.Unstructured) (Decision, error) {
+// Before overwriting an existing host object it verifies provenance: the host
+// name is deterministic but not injective (long names are hash-truncated),
+// so two distinct tenant objects could in principle target the same host
+// name, and an unrelated object could already occupy it. In either case
+// reconcilePair refuses to clobber and records an explainable Skip rather
+// than silently destroying data.
+func (e *Engine) reconcilePair(ctx context.Context, direction Direction, conflictPolicy string, ref syncplan.ResourceRef, virtualObj, host *unstructured.Unstructured) (Decision, error) {
 	existing := &unstructured.Unstructured{}
 	existing.SetGroupVersionKind(host.GroupVersionKind())
 	err := e.HostClient.Get(ctx, client.ObjectKeyFromObject(host), existing)
@@ -212,16 +257,69 @@ func (e *Engine) applyHost(ctx context.Context, ref syncplan.ResourceRef, host *
 			Reason: fmt.Sprintf("host name collides with a different tenant object (%s/%s)", existingRef.VirtualNamespace, existingRef.Name)}, nil
 	}
 
+	if direction == DirectionToHost {
+		return e.pushToHost(ctx, ref, target, existing, host)
+	}
+
+	// runtimeClassName is stamped onto the host object by this engine, not by
+	// the tenant (see syncPass) — it must never be compared against or pulled
+	// back from the host: the tenant's own virtual cluster has no such
+	// RuntimeClass to satisfy, and every pass would otherwise see a permanent,
+	// unresolvable "conflict" purely from an injection tenantplane itself made.
+	comparableHost := existing
+	if ref.Kind == "Pod" && e.RequiredRuntimeClassName != "" {
+		comparableHost = existing.DeepCopy()
+		unstructured.RemoveNestedField(comparableHost.Object, "spec", "runtimeClassName")
+	}
+
+	if syncplan.ContentEqual(virtualObj, comparableHost) {
+		return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
+			Reason: "tenant and host already agree"}, nil
+	}
+
+	switch {
+	case direction == DirectionFromHost:
+		return e.pullToTenant(ctx, ref, target, virtualObj, comparableHost, "host is authoritative for this direction")
+	case conflictPolicy == "tenant-wins":
+		return e.pushToHost(ctx, ref, target, existing, host)
+	case conflictPolicy == "host-wins":
+		return e.pullToTenant(ctx, ref, target, virtualObj, comparableHost, `conflictPolicy "host-wins": pulled the host's state into the tenant`)
+	default:
+		return Decision{Action: ActionSkip, Kind: ref.Kind, Ref: ref, Host: target,
+			Reason: `tenant and host disagree; conflictPolicy is "manual" (or unset) so neither side was changed`}, nil
+	}
+}
+
+// pushToHost writes the tenant's current state to the host, preserving the
+// host-allocated fields only the host's own cluster can assign (clusterIP and
+// friends) and the existing object's resourceVersion for an optimistic
+// concurrency check.
+func (e *Engine) pushToHost(ctx context.Context, ref syncplan.ResourceRef, target syncplan.HostTarget, existingHost, host *unstructured.Unstructured) (Decision, error) {
 	if d, limited := e.rateLimited(ref, target); limited {
 		return d, nil
 	}
-	host.SetResourceVersion(existing.GetResourceVersion())
-	syncplan.AdoptHostAllocatedFields(existing, host)
+	host.SetResourceVersion(existingHost.GetResourceVersion())
+	syncplan.AdoptHostAllocatedFields(existingHost, host)
 	if err := e.HostClient.Update(ctx, host); err != nil {
 		return Decision{}, err
 	}
 	return Decision{Action: ActionUpdate, Kind: ref.Kind, Ref: ref, Host: target,
 		Reason: "reconciled host object to match virtual source"}, nil
+}
+
+// pullToTenant writes the host's current content into the tenant's object,
+// preserving the tenant's own metadata (labels, annotations, resourceVersion):
+// unlike a host object tenantplane owns outright, the tenant object is
+// something the tenant still manages — only its content is reflected back.
+func (e *Engine) pullToTenant(ctx context.Context, ref syncplan.ResourceRef, target syncplan.HostTarget, virtualObj, existingHost *unstructured.Unstructured, reason string) (Decision, error) {
+	if d, limited := e.rateLimited(ref, target); limited {
+		return d, nil
+	}
+	merged := syncplan.MergeHostContentIntoTenant(existingHost, virtualObj)
+	if err := e.VirtualClient.Update(ctx, merged); err != nil {
+		return Decision{}, err
+	}
+	return Decision{Action: ActionUpdate, Kind: ref.Kind, Ref: ref, Host: target, Reason: reason}, nil
 }
 
 // rateLimited reports whether this tenant's apiFairness budget is exhausted

@@ -43,18 +43,24 @@ spec:
 
 | Direction | Meaning | Status |
 | --- | --- | --- |
-| `toHost` | Tenant objects are projected onto the host. | Implemented |
-| `fromHost` | Host objects are reflected back into the tenant. | Planned |
-| `bidirectional` | Synced both ways with conflict resolution. | Planned |
+| `toHost` | Tenant objects are projected onto the host; the tenant is authoritative. | Implemented |
+| `fromHost` | The host mirror is bootstrap-created from the tenant, then the host is authoritative from then on: its content is reflected back into the tenant every pass. | Implemented |
+| `bidirectional` | Either side may drift. When tenant and host currently agree, nothing happens; when they disagree, `conflictPolicy` decides. | Implemented |
 
-Entries whose direction is not yet implemented are **accepted but skipped** — the
-engine never pretends to have synced something it can't.
+Discovery always enumerates the tenant's own objects, in every direction — so
+deleting the tenant object removes the host mirror too, regardless of which way
+content flows. There is no persisted history of prior syncs: each pass compares
+*current* tenant vs. *current* host state, so a real, resolved conflict looks
+the same to the engine as one side having drifted alone.
 
 ## Conflict policy
 
-`conflictPolicy` selects how bidirectional conflicts resolve. `manual` is the
-safe default: the engine records the conflict rather than guessing. `tenant-wins`
-and `host-wins` will be honored as bidirectional sync lands.
+`conflictPolicy` selects how a `bidirectional` disagreement resolves:
+
+- `manual` (the safe default) — the engine records the conflict as a `Skip`
+  decision and changes neither side.
+- `tenant-wins` — the tenant's current state is pushed to the host, like `toHost`.
+- `host-wins` — the host's current state is pulled into the tenant, like `fromHost`.
 
 ## Explainability
 
