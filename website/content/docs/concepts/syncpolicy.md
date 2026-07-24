@@ -64,9 +64,18 @@ the same to the engine as one side having drifted alone.
 
 ## Explainability
 
-- `explain.recordDecisions` toggles decision recording.
-- Every sync action (create, update, delete, skip) produces one decision,
-  surfaced today as a Kubernetes Event on the owning TenantCluster.
+- `explain.recordDecisions` toggles decision recording entirely. `false` means
+  no decision trail at all; `true` records every sync action (create, update,
+  delete, skip) both as a Kubernetes Event on the owning TenantCluster and in a
+  durable `SyncDecision` object.
+- `explain.retain` caps how many decisions the `SyncDecision` object keeps —
+  the oldest are evicted first. Events, separately, still age out on the
+  cluster's own default retention.
+
+A `SyncDecision` is a namespaced object named after its TenantCluster (and
+owned by it), e.g. `kubectl get syncdecision dev -n team-dev -o yaml`. Unlike
+Events, its entries aren't subject to cluster-wide Event retention and can be
+queried directly.
 
 See the [sync engine](/docs/concepts/sync-engine/) for how these declarations are
 executed.

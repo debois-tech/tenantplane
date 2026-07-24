@@ -4,7 +4,7 @@ description: "Field-level reference for the tenantplane custom resources."
 weight: 31
 ---
 
-All three resources live in the `tenantplane.io/v1alpha1` API group. The
+All four resources live in the `tenantplane.io/v1alpha1` API group. The
 authoritative definitions are the CRDs in `config/crd`; this page summarizes the
 fields.
 
@@ -30,7 +30,7 @@ fields.
 | `status.phase` | string | `Pending`/`Provisioning`/`Ready`/`Degraded`. |
 | `status.endpoint` | string | In-cluster tenant API server address once Ready. |
 | `status.externalEndpoint` | string | Load-balancer address once `expose.loadBalancer` has provisioned. |
-| `status.conditions[]` | list | `Ready`, `Synced`, `ModeSupported`. |
+| `status.conditions[]` | list | `Ready`, `Synced`, `ModeSupported`, `IsolationEnforced`, `SyncSupported`, `AdmissionHardening`, `ControllerRBACScoped`. |
 
 ## IsolationProfile
 
@@ -57,6 +57,23 @@ fields.
 | `spec.resources[].apiVersion` | string | e.g. `v1`. |
 | `spec.resources[].kind` | string | e.g. `Pod`, `ConfigMap`. |
 | `spec.resources[].direction` | string | `toHost` \| `fromHost` \| `bidirectional` — all implemented. |
+
+## SyncDecision
+
+Namespaced, one per tenant — same name and namespace as its TenantCluster, and
+owned by it. Only created when the owning SyncPolicy sets
+`explain.recordDecisions`; see [SyncPolicy](/docs/concepts/syncpolicy/#explainability).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `status.entries[].time` | string (date-time) | When the decision was recorded. |
+| `status.entries[].action` | string | `Create` \| `Update` \| `Delete` \| `Skip`. |
+| `status.entries[].kind` | string | Resource kind. |
+| `status.entries[].tenantNamespace` / `tenantName` | string | The tenant-side object. |
+| `status.entries[].hostNamespace` / `hostName` | string | The host-side object. |
+| `status.entries[].reason` | string | Human-readable explanation. |
+
+Bounded to at most `explain.retain` entries, oldest evicted first.
 
 ## Reverse-mapping metadata
 

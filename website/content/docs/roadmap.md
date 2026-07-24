@@ -9,7 +9,8 @@ not a commitment to dates or ordering.
 
 ## Built today
 
-- Custom resources: `TenantCluster`, `IsolationProfile`, `SyncPolicy`.
+- Custom resources: `TenantCluster`, `IsolationProfile`, `SyncPolicy`,
+  `SyncDecision`.
 - Controller that reconciles a shared-mode k3s control plane (StatefulSet +
   headless Service) in a dedicated control-plane namespace, separate from
   tenant workloads, so Pod Security is enforced at the profile's real
@@ -22,7 +23,9 @@ not a commitment to dates or ordering.
 - Full sync engine: `toHost`, `fromHost`, and `bidirectional` directions, all
   with orphan garbage collection; `bidirectional` honors `conflictPolicy`
   (`manual`, `tenant-wins`, `host-wins`).
-- Sync decisions recorded as Kubernetes Events.
+- Sync decisions recorded as Kubernetes Events and, when
+  `explain.recordDecisions` is set, in a durable, queryable `SyncDecision`
+  object per tenant (capped by `explain.retain`).
 - Controller RBAC narrowed to the namespaces it actually manages, with the
   same ValidatingAdmissionPolicy backstop pattern hardening it further.
 - CLI: resource rendering and offline `explain-sync`.
@@ -31,12 +34,11 @@ not a commitment to dates or ordering.
 
 ## Next
 
-- **SyncDecision records** — a durable, queryable decision stream beyond
-  Events, which would also let conflict detection compare against the last
-  synced state instead of only current tenant vs. current host state.
-- **Honor `driftDetection.interval` and `explain.retain`** — sync currently
-  runs on the controller's fixed resync cadence and decisions are Events with
-  cluster-default retention regardless of what a SyncPolicy declares.
+- **Honor `driftDetection.interval`** — sync currently runs on the
+  controller's fixed resync cadence regardless of what a SyncPolicy declares.
+  A persisted decision history (now that `SyncDecision` exists) would also let
+  conflict detection compare against the last synced state instead of only
+  current tenant vs. current host state.
 - **Kubernetes version selection** — map `kubernetesVersion` to a k3s image.
 - **Multi-replica / HA control planes** and non-SQLite datastores.
 
