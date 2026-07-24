@@ -13,7 +13,7 @@ import (
 	"github.com/debois-tech/tenantplane/internal/syncplan"
 )
 
-const version = "0.1.0-dev"
+const version = "0.2.0-dev"
 
 // kubernetesVersionPattern mirrors the CRD's own CEL validation (see
 // config/crd/tenantclusters.tenantplane.io.yaml) so this offline CLI can

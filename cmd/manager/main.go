@@ -13,7 +13,7 @@ import (
 	"github.com/debois-tech/tenantplane/internal/controller"
 )
 
-const version = "0.1.0-dev"
+const version = "0.2.0-dev"
 
 // banner prints a short, human-friendly startup line to stdout — separate from
 // the structured zap logging below, which stays JSON/console-formatted for log
