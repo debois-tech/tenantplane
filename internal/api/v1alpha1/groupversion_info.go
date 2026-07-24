@@ -23,4 +23,5 @@ func init() {
 	SchemeBuilder.Register(&TenantCluster{}, &TenantClusterList{})
 	SchemeBuilder.Register(&IsolationProfile{}, &IsolationProfileList{})
 	SchemeBuilder.Register(&SyncPolicy{}, &SyncPolicyList{})
+	SchemeBuilder.Register(&SyncDecision{}, &SyncDecisionList{})
 }

@@ -60,12 +60,20 @@ func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.Tena
 		return fmt.Errorf("connect to tenant control plane: %w", err)
 	}
 
+	// explain.recordDecisions toggles decision recording entirely (Events and
+	// the durable SyncDecision store alike) — a nil Recorder is a documented
+	// no-op on the engine side (see Engine.record).
+	var recorder syncer.DecisionRecorder
+	if policy.Spec.Explain.RecordDecisions {
+		recorder = &eventDecisionRecorder{recorder: r.Recorder, object: tc}
+	}
+
 	engine := &syncer.Engine{
 		Tenant:                   tc.Name,
 		HostNamespace:            tc.Namespace,
 		VirtualClient:            virtualClient,
 		HostClient:               r.Client,
-		Recorder:                 &eventDecisionRecorder{recorder: r.Recorder, object: tc},
+		Recorder:                 recorder,
 		RequiredRuntimeClassName: profile.RuntimeClassName,
 		RateLimiter:              rateLimiterForFairness(profile.APIFairness),
 	}
@@ -93,6 +101,11 @@ func (r *TenantClusterReconciler) runSync(ctx context.Context, tc *v1alpha1.Tena
 				firstErr = err
 			}
 			continue
+		}
+		if policy.Spec.Explain.RecordDecisions {
+			if err := r.recordSyncDecisions(ctx, tc, decisions, policy.Spec.Explain.Retain); err != nil {
+				logger.Error(err, "failed to persist durable sync decisions", "kind", res.GVK.Kind)
+			}
 		}
 		logger.V(1).Info("sync pass complete", "kind", res.GVK.Kind, "direction", res.Direction, "decisions", len(decisions))
 	}

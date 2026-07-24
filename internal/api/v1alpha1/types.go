@@ -54,6 +54,48 @@ type SyncPolicyList struct {
 	Items []SyncPolicy `json:"items"`
 }
 
+// SyncDecision is the durable, queryable record of a TenantCluster's sync
+// decisions — one object per tenant (same name/namespace as the
+// TenantCluster, owned by it), holding a bounded, most-recent-first window
+// of entries. It exists because Kubernetes Events (the other place a
+// decision is surfaced) have cluster-default retention and are not
+// individually queryable by tenant/kind/action the way a real resource is.
+// Only created when the owning SyncPolicy sets explain.recordDecisions.
+//
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+type SyncDecision struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Status SyncDecisionStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+type SyncDecisionList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []SyncDecision `json:"items"`
+}
+
+type SyncDecisionStatus struct {
+	// Entries holds at most the owning SyncPolicy's explain.retain most
+	// recent decisions, oldest first.
+	Entries []SyncDecisionEntry `json:"entries,omitempty"`
+}
+
+type SyncDecisionEntry struct {
+	Time            metav1.Time `json:"time"`
+	Action          string      `json:"action"`
+	Kind            string      `json:"kind"`
+	TenantNamespace string      `json:"tenantNamespace"`
+	TenantName      string      `json:"tenantName"`
+	HostNamespace   string      `json:"hostNamespace"`
+	HostName        string      `json:"hostName"`
+	Reason          string      `json:"reason,omitempty"`
+}
+
 type TenantMode string
 
 const (

@@ -15,7 +15,7 @@ metadata:
   name: tenantplane-controller
 rules:
   - apiGroups: ["tenantplane.io"]
-    resources: ["tenantclusters", "tenantclusters/status", "isolationprofiles", "syncpolicies"]
+    resources: ["tenantclusters", "tenantclusters/status", "isolationprofiles", "syncpolicies", "syncdecisions", "syncdecisions/status"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["namespaces", "services", "pods", "resourcequotas", "limitranges", "persistentvolumeclaims"]
