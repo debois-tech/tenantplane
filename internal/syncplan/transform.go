@@ -2,6 +2,7 @@ package syncplan
 
 import (
 	"fmt"
+	"reflect"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -128,14 +129,25 @@ func stripHostAllocatedSpecFields(kind string, host *unstructured.Unstructured) 
 	}
 }
 
-// AdoptHostAllocatedFields copies host-allocated Service fields from the live
-// host object onto the desired object before an update: the host's allocator
-// owns them, and clusterIP in particular is immutable, so an update that omits
-// it would be rejected.
+// AdoptHostAllocatedFields copies fields the host — not the tenant — owns
+// from the live host object onto the desired object before an update, so the
+// write does not omit or contradict something only the host allocates or that
+// Kubernetes forbids changing post-create. For Service that is a handful of
+// allocator fields (clusterIP is immutable once assigned). For Pod it is
+// almost the entire spec: see adoptPodImmutableFields.
 func AdoptHostAllocatedFields(existing, desired *unstructured.Unstructured) {
-	if existing == nil || desired == nil || existing.GetKind() != "Service" {
+	if existing == nil || desired == nil {
 		return
 	}
+	switch existing.GetKind() {
+	case "Service":
+		adoptServiceAllocatedFields(existing, desired)
+	case "Pod":
+		adoptPodImmutableFields(existing, desired)
+	}
+}
+
+func adoptServiceAllocatedFields(existing, desired *unstructured.Unstructured) {
 	for _, field := range serviceAllocatedSpecFields {
 		value, found, _ := unstructured.NestedFieldCopy(existing.Object, "spec", field)
 		if !found {
@@ -143,6 +155,98 @@ func AdoptHostAllocatedFields(existing, desired *unstructured.Unstructured) {
 		}
 		_ = unstructured.SetNestedField(desired.Object, value, "spec", field)
 	}
+}
+
+// adoptPodImmutableFields keeps a re-synced Pod's update valid by starting
+// from the live object's spec (Kubernetes rejects a Pod update touching
+// almost anything else once it is scheduled — nodeName above all) and
+// re-applying only the handful of fields Kubernetes does allow changing
+// after create: container/init-container images by name, activeDeadlineSeconds,
+// and tolerations (as pure additions — Kubernetes never allows removing one).
+// Without this, every sync pass after the first successful Create would fail
+// outright the moment the Pod was scheduled to a node.
+func adoptPodImmutableFields(existing, desired *unstructured.Unstructured) {
+	existingSpec, found, _ := unstructured.NestedMap(existing.Object, "spec")
+	if !found {
+		return
+	}
+	desiredSpec, _, _ := unstructured.NestedMap(desired.Object, "spec")
+
+	if containers, found, _ := unstructured.NestedSlice(desiredSpec, "containers"); found {
+		if ec, found, _ := unstructured.NestedSlice(existingSpec, "containers"); found {
+			_ = unstructured.SetNestedSlice(existingSpec, overlayContainerImages(ec, containers), "containers")
+		}
+	}
+	if initContainers, found, _ := unstructured.NestedSlice(desiredSpec, "initContainers"); found {
+		if ec, found, _ := unstructured.NestedSlice(existingSpec, "initContainers"); found {
+			_ = unstructured.SetNestedSlice(existingSpec, overlayContainerImages(ec, initContainers), "initContainers")
+		}
+	}
+	if v, found, _ := unstructured.NestedInt64(desiredSpec, "activeDeadlineSeconds"); found {
+		_ = unstructured.SetNestedField(existingSpec, v, "activeDeadlineSeconds")
+	}
+	if tolerations, found, _ := unstructured.NestedSlice(desiredSpec, "tolerations"); found {
+		existingTolerations, _, _ := unstructured.NestedSlice(existingSpec, "tolerations")
+		_ = unstructured.SetNestedSlice(existingSpec, mergeTolerations(existingTolerations, tolerations), "tolerations")
+	}
+
+	_ = unstructured.SetNestedMap(desired.Object, existingSpec, "spec")
+}
+
+// overlayContainerImages returns existing's containers with each one's image
+// replaced by the same-named container's image from desired, if present. The
+// container set itself is never added to or removed from: Kubernetes does not
+// allow that on a running Pod either, only image changes within it.
+func overlayContainerImages(existing, desired []interface{}) []interface{} {
+	desiredImages := make(map[string]interface{}, len(desired))
+	for _, c := range desired {
+		m, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := m["name"].(string)
+		if name == "" {
+			continue
+		}
+		if image, ok := m["image"]; ok {
+			desiredImages[name] = image
+		}
+	}
+
+	out := make([]interface{}, len(existing))
+	for i, c := range existing {
+		m, ok := c.(map[string]interface{})
+		if !ok {
+			out[i] = c
+			continue
+		}
+		name, _ := m["name"].(string)
+		if image, ok := desiredImages[name]; ok {
+			m["image"] = image
+		}
+		out[i] = m
+	}
+	return out
+}
+
+// mergeTolerations returns existing's tolerations plus any from desired not
+// already present, since Kubernetes allows only adding tolerations to a
+// running Pod, never removing or replacing one.
+func mergeTolerations(existing, desired []interface{}) []interface{} {
+	out := append([]interface{}{}, existing...)
+	for _, d := range desired {
+		dup := false
+		for _, e := range existing {
+			if reflect.DeepEqual(d, e) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // ReverseLookup recovers the tenant-side identity of a host object from the

@@ -245,6 +245,56 @@ func TestAdoptHostAllocatedFields(t *testing.T) {
 	}}
 	AdoptHostAllocatedFields(cm, out)
 	if _, found, _ := unstructured.NestedFieldNoCopy(out.Object, "spec", "clusterIP"); found {
-		t.Fatal("AdoptHostAllocatedFields must only act on Services")
+		t.Fatal("AdoptHostAllocatedFields must only act on Services and Pods")
+	}
+}
+
+func TestAdoptHostAllocatedFieldsPodPreservesImmutableSpecAndUpdatesImage(t *testing.T) {
+	existing := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"spec": map[string]interface{}{
+			"nodeName":           "tenantplane-dev-control-plane",
+			"serviceAccountName": "default",
+			"containers": []interface{}{
+				map[string]interface{}{"name": "web", "image": "nginx:1.24"},
+			},
+			"tolerations": []interface{}{
+				map[string]interface{}{"key": "node.kubernetes.io/not-ready", "operator": "Exists"},
+			},
+		},
+	}}
+	// desired is what a fresh sync pass built from the tenant's (never
+	// scheduled, so nodeName-less) pod: an image bump plus a new toleration.
+	desired := &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"spec": map[string]interface{}{
+			"containers": []interface{}{
+				map[string]interface{}{"name": "web", "image": "nginx:1.25"},
+			},
+			"tolerations": []interface{}{
+				map[string]interface{}{"key": "node.kubernetes.io/not-ready", "operator": "Exists"},
+				map[string]interface{}{"key": "extra", "operator": "Exists"},
+			},
+			"runtimeClassName": "kata-qemu",
+		},
+	}}
+
+	AdoptHostAllocatedFields(existing, desired)
+
+	if got, _, _ := unstructured.NestedString(desired.Object, "spec", "nodeName"); got != "tenantplane-dev-control-plane" {
+		t.Fatalf("nodeName = %q, want the scheduled node adopted from the live object (Kubernetes forbids clearing it)", got)
+	}
+	if got, _, _ := unstructured.NestedString(desired.Object, "spec", "serviceAccountName"); got != "default" {
+		t.Fatal("serviceAccountName must be adopted from the live object too")
+	}
+	containers, _, _ := unstructured.NestedSlice(desired.Object, "spec", "containers")
+	if img, _, _ := unstructured.NestedString(containers[0].(map[string]interface{}), "image"); img != "nginx:1.25" {
+		t.Fatalf("container image = %q, want the tenant's updated image to still take effect", img)
+	}
+	tolerations, _, _ := unstructured.NestedSlice(desired.Object, "spec", "tolerations")
+	if len(tolerations) != 2 {
+		t.Fatalf("tolerations = %v, want the existing one plus the new addition (2 total)", tolerations)
 	}
 }
