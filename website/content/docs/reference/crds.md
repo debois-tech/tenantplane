@@ -13,7 +13,7 @@ fields.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `spec.mode` | string | `shared` \| `dedicated` \| `private`. Only `shared` implemented. |
-| `spec.kubernetesVersion` | string | Requested tenant version (not yet image-selecting). |
+| `spec.kubernetesVersion` | string | Requested minor version, e.g. `v1.31` (patch optional and ignored). Only `v1.28`-`v1.33` have a known k3s image; others are rejected at admission. |
 | `spec.isolationProfileRef.name` | string | Referenced IsolationProfile. |
 | `spec.syncPolicyRef.name` | string | Referenced SyncPolicy. |
 | `spec.controlPlane.replicas` | int | Control-plane replicas (single supported). |

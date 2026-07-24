@@ -30,14 +30,14 @@ not a commitment to dates or ordering.
   SyncPolicy setting is now honored end to end.
 - Controller RBAC narrowed to the namespaces it actually manages, with the
   same ValidatingAdmissionPolicy backstop pattern hardening it further.
+- `kubernetesVersion` selects an actual k3s image (`v1.28`-`v1.33`); anything
+  else is rejected at admission rather than silently defaulted.
 - CLI: resource rendering and offline `explain-sync`.
 - Managed Kubernetes support (EKS, AKS, GKE): storage class selection,
   LoadBalancer exposure with cloud annotations, extra TLS SANs.
 
 ## Next
 
-- **Kubernetes version selection** — map `kubernetesVersion` to a k3s image;
-  currently accepted but not image-selecting.
 - **Persisted decision history** — `SyncDecision` records every action taken,
   but conflict detection still only compares current tenant vs. current host
   state; a retained history would let it tell "only one side changed" from a
